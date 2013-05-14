@@ -127,6 +127,9 @@ namespace Mono.CSharp
 		PredefinedAttributes predefined_attributes;
 		PredefinedTypes predefined_types;
 		PredefinedMembers predefined_members;
+		PlayScript.PredefinedAttributes playscript_attributes;
+		PlayScript.PredefinedTypes playscript_types;
+		PlayScript.PredefinedMembers playscript_members;
 
 		static readonly string[] attribute_targets = new string[] { "assembly", "module" };
 
@@ -263,6 +266,24 @@ namespace Mono.CSharp
 		internal PredefinedTypes PredefinedTypes {
 			get {
 				return predefined_types;
+			}
+		}
+
+		internal PlayScript.PredefinedAttributes PlayscriptAttributes {
+			get {
+				return playscript_attributes;
+			}
+		}
+
+		internal PlayScript.PredefinedTypes PlayscriptTypes {
+			get {
+				return playscript_types;
+			}
+		}
+
+		internal PlayScript.PredefinedMembers PlayScriptMembers {
+			get {
+				return playscript_members;
 			}
 		}
 
@@ -534,6 +555,9 @@ namespace Mono.CSharp
 			predefined_attributes = new PredefinedAttributes (this);
 			predefined_types = new PredefinedTypes (this);
 			predefined_members = new PredefinedMembers (this);
+			playscript_attributes = new PlayScript.PredefinedAttributes (this);
+			playscript_types = new PlayScript.PredefinedTypes (this);
+			playscript_members = new PlayScript.PredefinedMembers (this);
 		}
 
 		public override bool IsClsComplianceRequired ()

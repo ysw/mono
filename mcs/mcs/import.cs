@@ -123,6 +123,7 @@ namespace Mono.CSharp
 		protected readonly ModuleContainer module;
 
 		public static readonly string CompilerServicesNamespace = "System.Runtime.CompilerServices";
+		public static readonly string PlayScriptCompilerNamespace = "PlayScript.Runtime.CompilerServices";
 
 		protected MetadataImporter (ModuleContainer module)
 		{
@@ -498,9 +499,14 @@ namespace Mono.CSharp
 				} else {
 					types[i] = ImportType (p.ParameterType, new DynamicTypeReader (p));
 
-					if (i >= pi.Length - 2 && types[i] is ArrayContainer) {
-						if (HasAttribute (CustomAttributeData.GetCustomAttributes (p), "ParamArrayAttribute", "System")) {
+					if (i >= pi.Length - 2) {
+						var ti = types[i];
+
+						if (ti is ArrayContainer && HasAttribute (CustomAttributeData.GetCustomAttributes (p), "ParamArrayAttribute", "System")) {
 							mod = Parameter.Modifier.PARAMS;
+							is_params = true;
+						} else if (ti == module.PlayscriptTypes.Array.TypeSpec && HasAttribute (CustomAttributeData.GetCustomAttributes (p), "RestArrayParameterAttribute", PlayScriptCompilerNamespace)) {
+							mod = Parameter.Modifier.RestArray;
 							is_params = true;
 						}
 					}
@@ -889,8 +895,21 @@ namespace Mono.CSharp
 					bts.SetDefinition (definition, type, mod);
 			}
 
-			if (spec == null)
+			if (spec == null) {
+				if (kind == MemberKind.Class && declaringType == null) {
+					var attributes = CustomAttributeData.GetCustomAttributes (type);
+					// TODO: Add assembly level attribute to speed this up?
+
+					if (HasAttribute (attributes, "DynamicClassAttribute", PlayScriptCompilerNamespace)) {
+						definition.IsPlayScriptType = true;
+						mod |= Modifiers.DYNAMIC;
+					} else if (HasAttribute (attributes, "PlayScriptAttribute", PlayScriptCompilerNamespace)) {
+						definition.IsPlayScriptType = true;
+					}
+				}
+
 				spec = new TypeSpec (kind, declaringType, definition, type, mod);
+			}
 
 			import_cache.Add (type, spec);
 
@@ -1002,6 +1021,9 @@ namespace Mono.CSharp
 					base_type = CreateType (type.BaseType, new DynamicTypeReader (type), true);
 				else
 					base_type = CreateType (type.BaseType);
+
+				if (base_type == null && spec.MemberDefinition.IsPlayScriptType)
+					base_type = module.PlayscriptTypes.Object;
 
 				spec.BaseType = base_type;
 			}
@@ -1788,6 +1810,8 @@ namespace Mono.CSharp
 			}
 		}
 
+		public bool IsPlayScriptType { get; set; }
+
 		public override string Name {
 			get {
 				if (name == null) {
@@ -2206,6 +2230,12 @@ namespace Mono.CSharp
 		}
 
 		bool ITypeDefinition.IsTypeForwarder {
+			get {
+				return false;
+			}
+		}
+
+		bool ITypeDefinition.IsPlayScriptType {
 			get {
 				return false;
 			}

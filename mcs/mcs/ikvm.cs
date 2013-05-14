@@ -377,7 +377,7 @@ namespace Mono.CSharp
 			// For now the "default config" is harcoded into the compiler
 			// we can move this outside later
 			//
-			var default_references = new List<string> (4);
+			var default_references = new List<string> (8);
 
 			default_references.Add ("System.dll");
 			default_references.Add ("System.Xml.dll");
@@ -385,6 +385,8 @@ namespace Mono.CSharp
 
 			if (corlib != null && corlib.GetName ().Version.Major >= 4) {
 				default_references.Add ("Microsoft.CSharp.dll");
+
+				default_references.Add ("PlayScript.Core");
 			}
 
 			return default_references.ToArray ();

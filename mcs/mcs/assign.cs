@@ -392,9 +392,9 @@ namespace Mono.CSharp {
 			return System.Linq.Expressions.Expression.Assign (target_object, source_object);
 		}
 #endif
-		protected virtual Expression ResolveConversions (ResolveContext ec)
+		protected virtual Expression ResolveConversions (ResolveContext rc)
 		{
-			source = Convert.ImplicitConversionRequired (ec, source, target.Type, source.Location);
+			source = Convert.ImplicitConversionRequiredEnhanced (rc, source, target.Type, source.Location);
 			if (source == null)
 				return null;
 
