@@ -6,7 +6,7 @@
 // Dual licensed under the terms of the MIT X11 or GNU GPL
 //
 // Copyright 2009-2011 Novell, Inc
-// Copyright 2011-2012 Xamarin, Inc (http://www.xamarin.com)
+// Copyright 2011-2013 Xamarin, Inc (http://www.xamarin.com)
 //
 
 using System;
@@ -640,7 +640,24 @@ namespace Mono.CSharp
 			}
 
 			PropertySpec spec = null;
-			if (!param.IsEmpty) {
+			ImportedMemberDefinition imd = new ImportedMemberDefinition (pi, type, this);
+
+			if (param.IsEmpty) {
+				if (get != null && set == null && declaringType.MemberDefinition.IsPlayScriptType) {
+					var attributes = CustomAttributeData.GetCustomAttributes (pi);
+
+					var data = FindAttribute (attributes, "ConstantFieldAttribute", PlayScriptCompilerNamespace);
+					if (data != null) {
+						var pc = new PlayScript.ImportedPropertyConstant (pi, type, this);
+						if (data.ConstructorArguments.Count == 1) {
+							pc.Initializer = Constant.CreateConstantFromValue (type,
+								data.ConstructorArguments[0].Value, Location.Null);
+						}
+
+						imd = pc;
+					}
+				}
+			} else {
 				if (is_valid_property) {
 					var index_name = declaringType.MemberDefinition.GetAttributeDefaultMember ();
 					if (index_name == null) {
@@ -679,7 +696,7 @@ namespace Mono.CSharp
 			}
 
 			if (spec == null)
-				spec = new PropertySpec (MemberKind.Property, declaringType, new ImportedMemberDefinition (pi, type, this), type, pi, mod);
+				spec = new PropertySpec (MemberKind.Property, declaringType, imd, type, pi, mod);
 
 			if (!is_valid_property) {
 				spec.IsNotCSharpCompatible = true;
@@ -999,16 +1016,21 @@ namespace Mono.CSharp
 		//
 		public static bool HasAttribute (IList<CustomAttributeData> attributesData, string attrName, string attrNamespace)
 		{
+			return FindAttribute (attributesData, attrName, attrNamespace) != null;
+		}
+
+		static CustomAttributeData FindAttribute (IList<CustomAttributeData> attributesData, string attrName, string attrNamespace)
+		{
 			if (attributesData.Count == 0)
-				return false;
+				return null;
 
 			foreach (var attr in attributesData) {
 				var dt = attr.Constructor.DeclaringType;
 				if (dt.Name == attrName && dt.Namespace == attrNamespace)
-					return true;
+					return attr;
 			}
 
-			return false;
+			return null;
 		}
 
 		void ImportTypeBase (TypeSpec spec, MetaType type)

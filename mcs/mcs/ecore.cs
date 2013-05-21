@@ -238,6 +238,11 @@ namespace Mono.CSharp {
 			return null;
 		}
 
+		public virtual Constant ResolveAsPlayScriptConstant (ResolveContext rc)
+		{
+			return null;
+		}
+
 		public static void ErrorIsInaccesible (IMemberContext rc, string member, Location loc)
 		{
 			rc.Module.Compiler.Report.Error (122, loc, "`{0}' is inaccessible due to its protection level", member);
@@ -3110,7 +3115,7 @@ namespace Mono.CSharp {
 				}
 
 				InstanceExpression = new This (loc);
-				if (this is FieldExpr && rc.CurrentBlock.ParametersBlock.TopBlock.ThisVariable != null) {
+				if (this is FieldExpr && rc.CurrentBlock != null && rc.CurrentBlock.ParametersBlock.TopBlock.ThisVariable != null) {
 					using (rc.Set (ResolveContext.Options.OmitStructFlowAnalysis)) {
 						InstanceExpression = InstanceExpression.Resolve (rc);
 					}
@@ -5938,7 +5943,6 @@ namespace Mono.CSharp {
 			Error_TypeArgumentsCannotBeUsed (ec, "field", GetSignatureForError (), loc);
 		}
 	}
-
 	
 	//
 	// Expression that evaluates to a Property.
@@ -6203,6 +6207,15 @@ namespace Mono.CSharp {
 			}
 
 			return this;
+		}
+
+		public override Constant ResolveAsPlayScriptConstant (ResolveContext rc)
+		{
+			var prop = best_candidate.MemberDefinition as PlayScript.IConstantProperty;
+			if (prop != null)
+				return prop.Initializer.ResolveAsPlayScriptConstant (rc);
+
+			return null;
 		}
 
 		public override void SetTypeArguments (ResolveContext ec, TypeArguments ta)

@@ -1327,35 +1327,49 @@ namespace Mono.CSharp {
 	//
 	public class DefaultParameterValueExpression : CompositeExpression
 	{
+		bool resolved;
+
 		public DefaultParameterValueExpression (Expression expr)
 			: base (expr)
 		{
 		}
 
-		protected override Expression DoResolve (ResolveContext rc)
-		{
-			return base.DoResolve (rc);
-		}
-
 		public void Resolve (ResolveContext rc, Parameter p)
 		{
+			if (resolved)
+				return;
+
+			resolved = true;
+
 			var expr = Resolve (rc);
 			if (expr == null)
 				return;
 
 			expr = Child;
 
-			if (!(expr is Constant || expr is DefaultValueExpression || (expr is New && ((New) expr).IsDefaultStruct))) {
-				rc.Report.Error (1736, Location,
-					"The expression being assigned to optional parameter `{0}' must be a constant or default value",
-					p.Name);
+			if (!(expr is Constant || (expr is New && ((New) expr).IsDefaultStruct))) {
+				if (rc.IsPlayScriptType) {
+					expr = expr.ResolveAsPlayScriptConstant (rc);
+					if (expr == null) {
+						rc.Report.ErrorPlayScript (1047, Location,
+							"Parameter initializer is not a compile-time constant.");
 
-				return;
+						return;
+					}
+				} else if (!(expr is DefaultValueExpression)) {
+					rc.Report.Error (1736, Location,
+						"The expression being assigned to optional parameter `{0}' must be a constant or default value",
+						p.Name);
+
+					return;
+				}
 			}
 
 			var parameter_type = p.Type;
-			if (type == parameter_type)
+			if (type == parameter_type) {
+				this.expr = expr;
 				return;
+			}
 
 			var res = Convert.ImplicitConversionStandard (rc, expr, parameter_type, Location);
 			if (res != null) {

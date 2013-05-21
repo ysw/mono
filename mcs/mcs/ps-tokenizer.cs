@@ -652,7 +652,6 @@ namespace Mono.PlayScript
 			AddKeyword ("uint", Token.UINT);
 			AddKeyword ("ulong", Token.ULONG);
 			AddKeyword ("unchecked", Token.UNCHECKED);
-			AddKeyword ("undefined", Token.UNDEFINED);
 			AddKeyword ("unsafe", Token.UNSAFE);
 			AddKeyword ("use", Token.USE);
 			AddKeyword ("ushort", Token.USHORT);
@@ -708,7 +707,6 @@ namespace Mono.PlayScript
 				Token.OP_DEC,
 				Token.TRUE,
 				Token.FALSE,
-				Token.UNDEFINED,
 				Token.NULL,
 				Token.CHAR,
 				Token.INT,

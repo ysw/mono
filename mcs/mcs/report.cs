@@ -231,6 +231,17 @@ namespace Mono.CSharp {
 			printer.Print (msg, settings.ShowFullPaths);
 		}
 
+		public void WarningPlayScript (int code, Location loc, string error)
+		{
+			if (reporting_disabled > 0)
+				return;
+
+			var msg = new PlayScript.WarningMessage (code, loc, error, extra_information);
+			extra_information.Clear ();
+
+			printer.Print (msg, settings.ShowFullPaths);
+		}
+
 		public void Warning (int code, int level, Location loc, string format, string arg)
 		{
 			Warning (code, level, loc, String.Format (format, arg));

@@ -1,6 +1,5 @@
 ../../build/common/Consts.cs
 ./Assembly/AssemblyInfo.cs
-./PlayScript/Undefined.cs
 ./Array.play
 ./Boolean.cs
 ./DeprecatedAttribute.cs
@@ -32,11 +31,12 @@
 ./VerifyError.play
 ./XML.play
 ./XMLList.play
-./PartialAttribute.cs
 
 ./PlayScript.Runtime/BinaryOperator.cs
 ./PlayScript.Runtime/Binder.cs
 ./PlayScript.Runtime/Operations.cs
+./PlayScript.Runtime/Undefined.cs
+./PlayScript.Runtime.CompilerServices/ConstantFieldAttribute.cs
 ./PlayScript.Runtime.CompilerServices/DynamicClassAttribute.cs
 ./PlayScript.Runtime.CompilerServices/PlayScriptAttribute.cs
 ./PlayScript.Runtime.CompilerServices/RestArrayParameterAttribute.cs

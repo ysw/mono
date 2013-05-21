@@ -820,66 +820,6 @@ namespace Mono.PlayScript
 
 	}
 
-	/// <summary>
-	///   Implementation of the ActionScript `undefined' object constant.
-	/// </summary>
-	public class AsUndefinedLiteral : Expression
-	{
-		public AsUndefinedLiteral (Location l)
-		{
-			loc = l;
-		}
-
-		public override string ToString ()
-		{
-			return this.GetType ().Name + " (undefined)";
-		}
-
-		public override bool ContainsEmitWithAwait ()
-		{
-			throw new NotSupportedException ();
-		}
-
-		public override Expression CreateExpressionTree (ResolveContext ec)
-		{
-			throw new NotSupportedException ("ET");
-		}
-
-		protected override Expression DoResolve (ResolveContext ec)
-		{
-/*
-			if (ec.Target == Target.JavaScript) {
-				type = ec.BuiltinTypes.Dynamic;
-				eclass = ExprClass.Value;
-				return this;
-			}
-*/
-			throw new NotImplementedException ();
-//			return new MemberAccess(new TypeExpression(ec.Module.PlayscriptTypes.Undefined.Resolve(), loc), 
-//			                        "_undefined", loc).Resolve (ec);
-		}
-
-		protected override void CloneTo (CloneContext clonectx, Expression t)
-		{
-		}
-
-		public override void Emit (EmitContext ec)
-		{
-			throw new InternalErrorException ("Missing Resolve call");
-		}
-/*
-		public override void EmitJs (JsEmitContext jec)
-		{
-			jec.Buf.Write ("undefined", Location);
-		}
-*/
-		public override object Accept (StructuralVisitor visitor)
-		{
-			return visitor.Visit (this);
-		}
-
-	}
-
 	public class AsLocalFunction : Statement {
 		
 		public string Name;
@@ -1182,8 +1122,8 @@ namespace Mono.PlayScript
 					return me;
 				}
 
-			// Stage 3: Global functions
-			e = LookupPackageLevelFunction (rc);
+			// Stage 3: Global names lookup
+			e = LookupGlobalName (rc, Name + "_fn", restrictions) ?? LookupGlobalName (rc, "<Globals>", restrictions);
 			if (e != null)
 				return e;
 
@@ -1239,11 +1179,11 @@ namespace Mono.PlayScript
 			}
 		}
 
-		Expression LookupPackageLevelFunction (ResolveContext rc)
+		Expression LookupGlobalName (ResolveContext rc, string name, MemberLookupRestrictions restrictions)
 		{
 			bool errorMode = false;
 
-			FullNamedExpression fne = rc.LookupNamespaceOrType (Name + "_fn", 0, LookupMode.Normal, loc);
+			FullNamedExpression fne = rc.LookupNamespaceOrType (name, 0, LookupMode.Normal, loc);
 			if (fne == null || fne is Namespace) {
 				return null;
 			}
@@ -1253,7 +1193,7 @@ namespace Mono.PlayScript
 				return null;
 			}
 
-			Expression e = MemberLookup (rc, errorMode, member_type, Name, Arity, MemberLookupRestrictions.InvocableOnly, loc);
+			Expression e = MemberLookup (rc, errorMode, member_type, Name, Arity, restrictions, loc);
 			if (e == null)
 				return null;
 
@@ -1267,6 +1207,151 @@ namespace Mono.PlayScript
 */
 
 			return me;
+		}
+	}
+
+	interface IConstantProperty
+	{
+		Expression Initializer { get; }
+	}
+
+	class ImportedPropertyConstant : ImportedMemberDefinition, IConstantProperty
+	{
+		public ImportedPropertyConstant (MemberInfo member, TypeSpec type, MetadataImporter importer)
+			: base (member, type, importer)
+		{
+		}
+
+		public Expression Initializer { get; set; }
+	}
+
+	public class ConstantField : FieldBase
+	{
+		public class Property : CSharp.Property, IConstantProperty
+		{
+			public Property (TypeDefinition parent, FullNamedExpression type, Modifiers mod, MemberName name, Attributes attrs)
+				: base (parent, type, mod, name, attrs)
+			{
+			}
+
+			public Expression Initializer { get; set; }
+
+			public override void Emit ()
+			{
+				var rc = new ResolveContext (this);
+				rc.CurrentBlock = Get.Block;
+
+				var init = Initializer.Resolve (rc);
+				if (init != null) {
+					init = CSharp.Convert.ImplicitConversionRequiredEnhanced (rc, init, member_type, Initializer.Location);
+					if (init == null)
+						return;
+				}
+					
+				var c = init as Constant;
+				if (c == null) {
+					var set_field = new Field (Parent, new TypeExpression (Compiler.BuiltinTypes.Bool, Location), Modifiers.PRIVATE | Modifiers.COMPILER_GENERATED | (ModFlags & (Modifiers.STATIC | Modifiers.UNSAFE)),
+						new MemberName ("<" + GetFullName (MemberName) + ">__SetField", Location), null);
+
+					var lazy_field = new Field (Parent, type_expr, Modifiers.PRIVATE | Modifiers.COMPILER_GENERATED | (ModFlags & (Modifiers.STATIC | Modifiers.UNSAFE)),
+						new MemberName ("<" + GetFullName (MemberName) + ">__LazyField", Location), null);
+
+					set_field.Define ();
+					lazy_field.Define ();
+
+					Parent.AddField (set_field);
+					Parent.AddField (lazy_field);
+
+					// 
+					// If (!SetField) {
+					//   SetField = true;
+					//   LazyField = Initializer;
+					// }
+					//
+					var set_f_expr = new FieldExpr (set_field, Location);
+					var lazy_f_expr = new FieldExpr (lazy_field, Location);
+					if (!IsStatic) {
+						set_f_expr.InstanceExpression = new CompilerGeneratedThis (CurrentType, Location);
+						lazy_f_expr.InstanceExpression = new CompilerGeneratedThis (CurrentType, Location);
+					}
+
+					var expl = new ExplicitBlock (Get.Block, Location, Location);
+					Get.Block.AddScopeStatement (new If (new Unary (Unary.Operator.LogicalNot, set_f_expr, Location), expl, Location));
+
+					expl.AddStatement (new StatementExpression (new CompilerAssign (lazy_f_expr, init, Location)));
+					Get.Block.AddStatement (new Return (lazy_f_expr, Location));
+
+					Module.PlayscriptAttributes.ConstantField.EmitAttribute (PropertyBuilder);
+				} else {
+					//
+					// Simple constant, just return a value
+					//
+					Get.Block.AddStatement (new Return (init, Location));
+
+					//
+					// Store compile time constant to attribute for easier import
+					//
+					Module.PlayscriptAttributes.ConstantField.EmitAttribute (this, PropertyBuilder, c);
+				}
+
+				base.Emit ();
+			}
+		}
+
+		const Modifiers AllowedModifiers =
+			Modifiers.STATIC |
+			Modifiers.PUBLIC |
+			Modifiers.PROTECTED |
+			Modifiers.INTERNAL |
+			Modifiers.PRIVATE;
+
+		public ConstantField (TypeDefinition parent, FullNamedExpression type, Modifiers mod_flags, MemberName name, Attributes attrs)
+			: base (parent, type, mod_flags, AllowedModifiers, name, attrs)
+		{
+		}
+
+		public override bool Define ()
+		{
+			if (Initializer == null) {
+				Report.WarningPlayScript (1111, Location, "The constant was not initialized.");
+			}
+
+			if (!base.Define ())
+				return false;
+
+			if (Parent is PackageGlobalContainer)
+				ModFlags |= Modifiers.STATIC;
+
+			var t = new TypeExpression (MemberType, TypeExpression.Location);
+			var init = Initializer ?? new DefaultValueExpression (t, Location);
+
+			var prop = new Property (Parent, t, ModFlags, MemberName, attributes);
+			prop.Initializer = init;
+			prop.Get = new Property.GetMethod (prop, 0, null, prop.Location);
+			prop.Get.Block = new ToplevelBlock (Compiler, Location);
+
+			if (!prop.Define ())
+				return false;
+
+			var idx = Parent.Members.IndexOf (this);
+			Parent.Members[idx] = prop;
+
+			if (declarators != null) {
+				foreach (var d in declarators) {
+					init = d.Initializer ?? new DefaultValueExpression (t, Location);
+
+					prop = new Property (Parent, t, ModFlags, new MemberName (d.Name.Value, d.Name.Location), attributes);
+					prop.Initializer = init;
+
+					prop.Get = new Property.GetMethod (prop, 0, null, prop.Location);
+					prop.Get.Block = new ToplevelBlock (Compiler, Location); ;
+
+					prop.Define ();
+					Parent.PartialContainer.Members.Add (prop);
+				}
+			}
+
+			return true;
 		}
 	}
 
@@ -1547,6 +1632,7 @@ namespace Mono.PlayScript
 	class Package : NamespaceContainer
 	{
 		static readonly MemberName DefaultPackageName = new MemberName (PredefinedTypes.RootNamespace, Location.Null);
+		TypeDefinition globals;
 
 		private Package (MemberName name, NamespaceContainer parent)
 			: base (name, parent)
@@ -1577,6 +1663,24 @@ namespace Mono.PlayScript
 				return "";
 
 			return base.GetSignatureForError ();
+		}
+
+		public TypeDefinition GetGlobalsTypeDefinition ()
+		{
+			if (globals == null) {
+				globals = new PackageGlobalContainer (this);
+				AddTypeContainer (globals);
+			}
+
+			return globals;
+		}
+	}
+
+	class PackageGlobalContainer : CompilerGeneratedContainer
+	{
+		public PackageGlobalContainer (TypeContainer parent)
+			: base (parent, new MemberName ("<Globals>"), Modifiers.PUBLIC | Modifiers.STATIC)
+		{
 		}
 	}
 
@@ -1643,12 +1747,46 @@ namespace Mono.PlayScript
 
 	class PredefinedAttributes
 	{
+		public class PredefinedConstantAttribute : PredefinedAttribute
+		{
+			PredefinedMember<MethodSpec> ctor_definition;
+
+			public PredefinedConstantAttribute (ModuleContainer module, string ns, string name)
+				: base (module, ns, name)
+			{
+			}
+
+			public void EmitAttribute (IMemberContext mc, PropertyBuilder builder, Constant constant)
+			{
+				if (ctor_definition == null) {
+					if (!Define ())
+						return;
+
+					ctor_definition = new PredefinedMember<MethodSpec> (module, type, CSharp.MemberFilter.Constructor (
+						ParametersCompiled.CreateFullyResolved (module.Compiler.BuiltinTypes.Object)));
+				}
+
+				var ctor = ctor_definition.Get ();
+				if (ctor == null)
+					return;
+
+				AttributeEncoder encoder = new AttributeEncoder ();
+				encoder.Encode (constant.Type);
+				constant.EncodeAttributeValue (mc, encoder, ctor.Parameters.Types [0]);
+				encoder.EncodeEmptyNamedArguments ();
+
+				builder.SetCustomAttribute ((ConstructorInfo) ctor.GetMetaInfo (), encoder.ToArray ());
+			}
+		}
+
+		public readonly PredefinedConstantAttribute ConstantField;
 		public readonly PredefinedAttribute DynamicClassAttribute;
 		public readonly PredefinedAttribute PlayScriptAttribute;
 		public readonly PredefinedAttribute RestArrayParameterAttribute;
 
 		public PredefinedAttributes (ModuleContainer module)
 		{
+			ConstantField = new PredefinedConstantAttribute (module, "PlayScript.Runtime.CompilerServices", "ConstantFieldAttribute");
 			DynamicClassAttribute = new PredefinedAttribute (module, "PlayScript.Runtime.CompilerServices", "DynamicClassAttribute");
 			PlayScriptAttribute = new PredefinedAttribute (module, "PlayScript.Runtime.CompilerServices", "PlayScriptAttribute");
 			RestArrayParameterAttribute = new PredefinedAttribute (module, "PlayScript.Runtime.CompilerServices", "RestArrayParameterAttribute");
@@ -1657,7 +1795,6 @@ namespace Mono.PlayScript
 
 	static class Convert
 	{
-
 		public static Expression ImplicitConversion (Expression expr, TypeSpec target)
 		{
 			Expression e;
@@ -1726,6 +1863,32 @@ namespace Mono.PlayScript
 		public override string MessageType {
 			get {
 				return "error";
+			}
+		}
+	}
+
+	sealed class WarningMessage : AbstractMessage
+	{
+		public WarningMessage (int code, Location loc, string message, List<string> extra_info)
+			: base (code, loc, message, extra_info)
+		{
+		}
+
+		public override bool IsWarning {
+			get {
+				return true;
+			}
+		}
+
+		public override string MessageType {
+			get {
+				return "warning";
+			}
+		}
+
+		public override string LanguagePrefix {
+			get {
+				return "PS";
 			}
 		}
 	}

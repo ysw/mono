@@ -263,7 +263,6 @@ namespace Mono.PlayScript
 %token UINT	
 %token ULONG	
 %token UNCHECKED
-%token UNDEFINED
 %token UNSAFE
 %token USE	
 %token USHORT	
@@ -802,6 +801,7 @@ no_config_package_statement
 			current_namespace.DeclarationFound = true;
 		}
 	  }
+	| constant_declaration
 	| no_config_package_directive	  
 	;
 
@@ -1223,79 +1223,30 @@ constant_declaration
 	  CONST IDENTIFIER COLON type
 	  {
 		var lt = (LocatedToken) $4;
-		var mod = (Modifiers) $2;
-		mod &= ~Modifiers.STATIC;
-		current_field = new Const (current_type, (FullNamedExpression) $6, mod, new MemberName (lt.Value, lt.Location), (Attributes) $1);
+		var td = GetTypeDefinition (current_container);
+		current_field = new ConstantField (td, (FullNamedExpression) $6, (Modifiers) $2, new MemberName (lt.Value, lt.Location), (Attributes) $1);
 		if (is_config_enabled) {
-			current_type.AddMember (current_field);
+			td.AddMember (current_field);
 		}
 		is_config_enabled = true;
 				
 		$$ = current_field;
 	  }
-	  opt_constant_initializer opt_constant_declarators SEMICOLON
+	  opt_field_initializer opt_field_declarators SEMICOLON
 	  {
 		if (doc_support) {
 			current_field.DocComment = Lexer.consume_doc_comment ();
 			Lexer.doc_state = XmlCommentState.Allowed;
 		}
 		
-		current_field.Initializer = (ConstInitializer) $8;
 		lbag.AddMember (current_field, mod_locations, GetLocation ($3), GetLocation ($10));
 		current_field = null;
 	  }
 	;
-	
-opt_constant_declarators
-	: /* empty */
-	| constant_declarators
-	;
-	
-constant_declarators
-	: constant_declarator
-	  {
-		current_field.AddDeclarator ((FieldDeclarator) $1);
-	  }
-	| constant_declarators constant_declarator
-	  {
-		current_field.AddDeclarator ((FieldDeclarator) $2);
-	  }
-	;
-	
-constant_declarator
-	: COMMA IDENTIFIER COLON member_type opt_constant_initializer
-	  {
-		var lt = (LocatedToken) $2;
-	  	$$ = new FieldDeclarator (new SimpleMemberName (lt.Value, lt.Location), (ConstInitializer) $5, (FullNamedExpression) $4);
-	  	lbag.AddLocation ($$, GetLocation ($1));
-	  }
-	;		
 
-opt_constant_initializer
-	: /* empty */ { $$ = null; }
-	| constant_initializer
-	;
-
-constant_initializer
-	: ASSIGN
-	  {
-		++lexer.parsing_block;
-	  }
-	  constant_initializer_expr
-	  {
-		--lexer.parsing_block;
-		$$ = new ConstInitializer (current_field, (Expression) $3, GetLocation ($1));
-	  }
-	| error
-	  {
-		report.Error (145, lexer.Location, "A const field requires a value to be provided");
-		$$ = null;
-	  }	  
-	;
-	
 constant_initializer_expr
-	: constant_expression
-	;
+       : constant_expression
+       ;
 
 field_declaration
 	: opt_attributes
@@ -1630,9 +1581,9 @@ method_header
 		
 		} else {
 
-			if (current_container.Kind == MemberKind.Class && name.ExplicitInterface == null &&
-				(modifiers & (Modifiers.NEW | Modifiers.SEALED | Modifiers.STATIC | Modifiers.PRIVATE | Modifiers.VIRTUAL | Modifiers.OVERRIDE)) == 0)
-					modifiers |= Modifiers.VIRTUAL;
+//			if (current_container.Kind == MemberKind.Class && name.ExplicitInterface == null &&
+//				(modifiers & (Modifiers.NEW | Modifiers.SEALED | Modifiers.STATIC | Modifiers.PRIVATE | Modifiers.VIRTUAL | Modifiers.OVERRIDE)) == 0)
+//					modifiers |= Modifiers.VIRTUAL;
 
 			var ret_type = $9 as FullNamedExpression;
 			
@@ -3654,7 +3605,6 @@ primary_expression_or_type
 literal
 	: boolean_literal
 	| LITERAL
-	| UNDEFINED		{ $$ = new AsUndefinedLiteral (GetLocation ($1)); }
 	| NULL			{ $$ = new NullLiteral (GetLocation ($1)); }
 	;
 
@@ -8107,6 +8057,17 @@ AnonymousMethodExpression end_anonymous (ParametersBlock anon_block)
 	return retval;
 }
 
+static TypeDefinition GetTypeDefinition (TypeContainer container)
+{
+	var td = container as TypeDefinition;
+	if (td != null)
+		return td;
+
+	Package pkg = (Package) container;
+	return pkg.GetGlobalsTypeDefinition ();
+
+}
+
 void Error_SyntaxError (int token)
 {
 	Error_SyntaxError (0, token);
@@ -8584,8 +8545,6 @@ static string GetTokenName (int token)
 		return "typeof";
 	case Token.UNCHECKED:
 		return "unchecked";
-	case Token.UNDEFINED:
-		return "undefined";
 	case Token.UNSAFE:
 		return "unsafe";
 	case Token.USE:

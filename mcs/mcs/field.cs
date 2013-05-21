@@ -333,6 +333,14 @@ namespace Mono.CSharp
 			return metaInfo;
 		}
 
+		public void SetMetaInfo (FieldInfo info)
+		{
+			if (this.metaInfo != null)
+				throw new InternalErrorException ("MetaInfo reset");
+
+			this.metaInfo = info;
+		}
+
 		public override MemberSpec InflateMember (TypeParameterInflator inflator)
 		{
 			var fs = (FieldSpec) base.InflateMember (inflator);

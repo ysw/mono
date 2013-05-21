@@ -1827,8 +1827,6 @@ namespace Mono.CSharp {
 			if (ctor != null)
 				return true;
 
-			Define ();
-
 			//
 			// Handle all parameter-less attributes as optional
 			//
