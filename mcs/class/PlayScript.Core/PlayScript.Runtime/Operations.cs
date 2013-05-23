@@ -92,6 +92,34 @@ namespace PlayScript.Runtime
 			// TODO: uint, string, double, etc
 
 			return false;
-		}		
-	}
+		}	
+
+		public static string Typeof (object instance)
+		{
+			if (instance == null)
+				return "object";
+
+			if (instance is string)
+				return "string";
+
+			if (instance is int || instance is uint || instance is double)
+				return "number";
+
+			if (instance is bool)
+				return "boolean";
+
+			// TODO: Wrong, it has to be of a special type
+			if (instance == Undefined.Value) 
+				return "undefined";
+
+			// TODO: Wrong, it has to be of a special type			
+			if (instance is _root.XML || instance is _root.XMLList)
+				return "xml";
+			
+			if (instance is Delegate)
+				return "function";
+			
+			return "object";
+		}
+	}				
 }

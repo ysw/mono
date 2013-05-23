@@ -422,88 +422,39 @@ namespace Mono.PlayScript
 		}
 	}
 
-	//
-	// ActionScript: Implements the ActionScript typeof expression.
-	// This expression is for backwards compatibility with javascript
-	// and is not supported in ASX.
-	//
-	public class AsTypeOf : ExpressionStatement {
-		
-		public Expression Expr;
-		private Expression newExpr;
-		
-		public AsTypeOf (Expression expr, Location l)
+	public class TypeOf : PlayScriptExpression
+	{		
+		public TypeOf (Expression expr, Location l)
 		{
-			this.Expr = expr;
+			Expression = expr;
 			loc = l;
 		}
-		
-		public override bool IsSideEffectFree {
-			get {
-				return newExpr.IsSideEffectFree;
-			}
-		}
-		
-		public override bool ContainsEmitWithAwait ()
-		{
-			return newExpr.ContainsEmitWithAwait ();
-		}
-		
-		protected override Expression DoResolve (ResolveContext ec)
-		{
-/*
-			if (ec.Target == Target.JavaScript) {
-				type = ec.BuiltinTypes.Dynamic;
-				eclass = ExprClass.Value;
-				return this;
-			}
-*/
 
-//			if (loc.SourceFile != null && loc.SourceFile.PsExtended) {
-//				ec.Report.Error (7101, loc, "'typeof' operator not supported in ASX.'");
-//				return null;
-//			}
-
-			var args = new Arguments(1);
-			args.Add (new Argument(Expr));
-
-			return new Invocation(new MemberAccess(new MemberAccess(
-				new SimpleName(PredefinedTypes.RootNamespace, loc), "_typeof_fn", loc), "_typeof", loc), args).Resolve (ec);
-		}
-		
-		protected override void CloneTo (CloneContext clonectx, Expression t)
+		public Expression Expression { get; private set; }
+				
+		protected override Expression DoResolve (ResolveContext rc)
 		{
-			var target = (AsDelete) t;
-			
-			target.Expr = Expr.Clone (clonectx);
+			var expr = Expression.Resolve (rc); //, ResolveFlags.VariableOrValue | ResolveFlags.Type);
+			if (expr == null)
+				return null;
+
+//			if (expr is TypeExpr)
+//				expr = new CSharp.TypeOf (rc.Module.PlayscriptTypes.Object, Location).Resolve (rc);
+
+			var ms = rc.Module.PlayScriptMembers.OperationsTypeof.Resolve (loc);
+			if (ms == null)
+				return null;
+
+			var mg = MethodGroupExpr.CreatePredefined (ms, ms.DeclaringType, loc);
+			var call_args = new Arguments (1);
+			call_args.Add (new Argument (expr));
+
+			return new Invocation (mg, call_args).Resolve (rc);
 		}
-		
+
 		public override void Emit (EmitContext ec)
 		{
-			throw new System.NotImplementedException ();
-		}
-		
-		public override void EmitStatement (EmitContext ec)
-		{
-			throw new System.NotImplementedException ();
-		}
-/*		
-		public override void EmitJs (JsEmitContext jec)
-		{
-			jec.Buf.Write ("new ", Location);
-			Expr.EmitJs (jec);
-		}
-		
-		public override void EmitStatementJs (JsEmitContext jec)
-		{
-			jec.Buf.Write ("\t", Location);
-			EmitJs (jec);
-			jec.Buf.Write (";\n");
-		}
-*/		
-		public override Expression CreateExpressionTree (ResolveContext ec)
-		{
-			return newExpr.CreateExpressionTree(ec);
+			throw new NotSupportedException ();
 		}
 		
 		public override object Accept (StructuralVisitor visitor)
@@ -720,104 +671,54 @@ namespace Mono.PlayScript
 		}
 	}
 
-	/// <summary>
-	///   Implementation of the ActionScript `in' operator.
-	/// </summary>
-	public class AsIn : Expression
+	public class In : PlayScriptExpression
 	{
-		protected Expression expr;
-		protected Expression objExpr;
-
-		public AsIn (Expression expr, Expression obj_expr, Location l)
+		public In (Expression propertyExpr, Expression expression, Location loc)
 		{
-			this.expr = expr;
-			this.objExpr = obj_expr;
-			loc = l;
+			this.PropertyExpression = propertyExpr;
+			this.Expression = expression;
+			this.loc = loc;
 		}
 
-		public Expression Expr {
-			get {
-				return expr;
+		public Expression Expression { get; private set; }
+
+		public Expression PropertyExpression { get; private set; }
+
+		protected override Expression DoResolve (ResolveContext rc)
+		{
+			PropertyExpression = PropertyExpression.Resolve (rc);
+			Expression = Expression.Resolve (rc);
+			if (PropertyExpression == null || Expression == null)
+				return null;
+
+			if (Expression is MethodGroupExpr) {
+				var res = new BoolConstant (rc.BuiltinTypes, false, Location);
+				res.Resolve (rc);
+				return res;
 			}
-		}
 
-		public Expression ObjectExpression {
-			get {
-				return objExpr;
-			}
-		}
+			var ms = rc.Module.PlayScriptMembers.BinderHasProperty.Resolve (loc);
+			if (ms == null)
+				return null;
 
-		public override bool ContainsEmitWithAwait ()
-		{
-			throw new NotSupportedException ();
-		}
+			var args = new Arguments (3);
+			args.Add (new Argument (Expression));
+			args.Add (new Argument (new CSharp.TypeOf (rc.CurrentType, loc)));
+			args.Add (new Argument (PropertyExpression));
 
-		public override Expression CreateExpressionTree (ResolveContext ec)
-		{
-			throw new NotSupportedException ("ET");
-		}
-
-		protected override Expression DoResolve (ResolveContext ec)
-		{
-/*
-			if (ec.Target == Target.JavaScript) {
-				expr = Expr.Resolve (ec);
-				objExpr = objExpr.Resolve (ec);
-				type = ec.BuiltinTypes.Bool;
-				eclass = ExprClass.Value;
-				return this;
-			}
-*/
-			var objExpRes = objExpr.Resolve (ec);
-
-			var args = new Arguments (1);
-			args.Add (new Argument (expr));
-
-			throw new NotImplementedException ();
-/*
-
-			if (objExpRes.Type == ec.BuiltinTypes.Dynamic) {
-				// If dynamic, cast to IDictionary<string,object> and call ContainsKey
-				var dictExpr = new TypeExpression(ec.Module.PredefinedTypes.IDictionaryGeneric.Resolve().MakeGenericType(ec, 
-				                      new [] { ec.BuiltinTypes.String, ec.BuiltinTypes.Object }), loc);
-				return new Invocation (new MemberAccess (new Cast(dictExpr, objExpr, loc), "ContainsKey", loc), args).Resolve (ec);
-			} else {
-				string containsMethodName = "Contains";
-	
-				if (objExpRes.Type != null && objExpRes.Type.ImplementsInterface (ec.Module.PredefinedTypes.IDictionary.Resolve(), true)) {
-					containsMethodName = "ContainsKey";
-				}
-
-				return new Invocation (new MemberAccess (objExpr, containsMethodName, loc), args).Resolve (ec);
-			}
-*/
-		}
-
-		protected override void CloneTo (CloneContext clonectx, Expression t)
-		{
-			AsIn target = (AsIn) t;
-
-			target.expr = expr.Clone (clonectx);
-			target.objExpr = objExpr.Clone (clonectx);
+			var mg = MethodGroupExpr.CreatePredefined (ms, ms.DeclaringType, loc);
+			return new Invocation (mg, args).Resolve (rc);
 		}
 
 		public override void Emit (EmitContext ec)
 		{
-			throw new InternalErrorException ("Missing Resolve call");
+			throw new NotSupportedException ();
 		}
-/*
-		public override void EmitJs (JsEmitContext jec)
-		{
-			Expr.EmitJs (jec);
-			jec.Buf.Write (" in ");
-			ObjectExpression.EmitJs (jec);
-		}
-*/
+
 		public override object Accept (StructuralVisitor visitor)
 		{
 			return visitor.Visit (this);
 		}
-
 	}
 
 	public class AsLocalFunction : Statement {
@@ -1137,7 +1038,12 @@ namespace Mono.PlayScript
 						rc.Report.Error (135, loc, "`{0}' conflicts with a declaration in a child block", Name);
 					}
 
-					return ResolveAsTypeOrNamespace (rc);
+					var fne = ResolveAsTypeOrNamespace (rc);
+					if (fne != null && (restrictions & MemberLookupRestrictions.PlayScriptConversion) == 0) {
+						return new CSharp.TypeOf (fne, loc);
+					}
+
+					return fne;
 				}
 			}
 
@@ -1576,7 +1482,7 @@ namespace Mono.PlayScript
 			var mg = MethodGroupExpr.CreatePredefined (ms, ms.DeclaringType, loc);
 			var call_args = new Arguments (3);
 			call_args.Add (new Argument (instance));
-			call_args.Add (new Argument (new TypeOf (rc.CurrentType, loc)));
+			call_args.Add (new Argument (new CSharp.TypeOf (rc.CurrentType, loc)));
 			call_args.Add (args [0]);
 
 			invocation = new Invocation (mg, call_args).Resolve (rc);
@@ -1599,7 +1505,7 @@ namespace Mono.PlayScript
 			var mg = MethodGroupExpr.CreatePredefined (ms, ms.DeclaringType, loc);
 			var call_args = new Arguments (3);
 			call_args.Add (new Argument (instance));
-			call_args.Add (new Argument (new TypeOf (rc.CurrentType, loc)));
+			call_args.Add (new Argument (new CSharp.TypeOf (rc.CurrentType, loc)));
 			call_args.Add (args [0]);
 			call_args.Add (new Argument (rhs));
 
@@ -1729,6 +1635,8 @@ namespace Mono.PlayScript
 		public readonly PredefinedMember<MethodSpec> VectorPush;
 		public readonly PredefinedMember<MethodSpec> BinderGetMember;
 		public readonly PredefinedMember<MethodSpec> BinderSetMember;
+		public readonly PredefinedMember<MethodSpec> BinderHasProperty;
+		public readonly PredefinedMember<MethodSpec> OperationsTypeof;
 
 		public PredefinedMembers (ModuleContainer module)
 		{
@@ -1742,6 +1650,8 @@ namespace Mono.PlayScript
 			VectorPush = new PredefinedMember<MethodSpec> (module, ptypes.Vector, "push", new TypeParameterSpec (0, tp, SpecialConstraint.None, Variance.None, null));
 			BinderGetMember = new PredefinedMember<MethodSpec> (module, ptypes.Binder, "GetMember", btypes.Object, btypes.Type, btypes.Object);
 			BinderSetMember = new PredefinedMember<MethodSpec> (module, ptypes.Binder, "SetMember", btypes.Object, btypes.Type, btypes.Object, btypes.Object);
+			BinderHasProperty = new PredefinedMember<MethodSpec> (module, ptypes.Binder, "HasProperty", btypes.Object, btypes.Type, btypes.Object);
+			OperationsTypeof = new PredefinedMember<MethodSpec> (module, ptypes.Operations, "Typeof", btypes.Object);
 		}
 	}
 

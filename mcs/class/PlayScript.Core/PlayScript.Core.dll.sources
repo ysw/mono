@@ -34,6 +34,7 @@
 
 ./PlayScript.Runtime/BinaryOperator.cs
 ./PlayScript.Runtime/Binder.cs
+./PlayScript.Runtime/IsPropertyBinder.cs
 ./PlayScript.Runtime/Operations.cs
 ./PlayScript.Runtime/Undefined.cs
 ./PlayScript.Runtime.CompilerServices/ConstantFieldAttribute.cs

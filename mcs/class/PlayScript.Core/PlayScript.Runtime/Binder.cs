@@ -40,7 +40,7 @@ namespace PlayScript.Runtime
 		public static dynamic GetMember (object instance, Type context, object name)
 		{
 			if (instance == null)
-				throw new _root.Error ("Cannot access a property or method of a null object reference.", 1009);
+				throw GetNullObjectReferenceException ();
 			
 			var sname = GetName (name);
 
@@ -62,7 +62,7 @@ namespace PlayScript.Runtime
 		public static void SetMember (object instance, Type context, object name, object value)
 		{
 			if (instance == null)
-				throw new _root.Error ("Cannot access a property or method of a null object reference.", 1009);
+				throw GetNullObjectReferenceException ();
 
 			var sname = GetName (name);
 
@@ -82,13 +82,58 @@ namespace PlayScript.Runtime
 			}
 		}
 
+		public static bool HasProperty (object instance, Type context, object property)
+		{
+			if (instance == null)
+				throw GetNullObjectReferenceException ();
+
+			var type = instance as Type;
+			var sname = GetName (property);
+			bool static_only;
+
+			if (type == null) {
+				//
+				// It's null when it's not static
+				//
+				// TODO: thread safety
+				Dictionary<string, object> members;
+				if (dynamic_classes.TryGetValue (instance, out members)) {
+					if (members.ContainsKey (sname))
+						return true;
+
+				}
+
+				type = instance.GetType ();
+				static_only = false;
+			} else {
+				static_only = true;
+			}
+
+			var binder = new IsPropertyBinder (sname, context, static_only);	
+			
+			var callsite = CallSite<Func<CallSite, Type, bool>>.Create (binder);
+
+			// TODO: Better handling
+			try {
+				// TODO: Add caching to avoid expensive Resolve
+    			return callsite.Target (callsite, type);
+    		} catch (RuntimeBinderException) {
+    			throw;
+			}
+		}
+
 		static string GetName (object name)
 		{
-			// TODO: Will be special token enough
+			// TODO: Will be special token for null key enough?
 			if (name == null)
 				throw new NotImplementedException ("null name");
 			
 			return name.ToString ();
+		}
+
+		static Exception GetNullObjectReferenceException ()
+		{
+			return new _root.Error ("Cannot access a property or method of a null object reference.", 1009);			
 		}
 	}
 }

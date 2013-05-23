@@ -8057,7 +8057,7 @@ namespace Mono.CSharp
 			//
 			using (rc.Set (ResolveContext.Options.OmitStructFlowAnalysis)) {
 				if (sn != null) {
-					expr = sn.LookupNameExpression (rc, MemberLookupRestrictions.ReadAccess | MemberLookupRestrictions.ExactArity);
+					expr = sn.LookupNameExpression (rc, MemberLookupRestrictions.ReadAccess | MemberLookupRestrictions.ExactArity | MemberLookupRestrictions.PlayScriptConversion);
 
 					//
 					// Resolve expression which does have type set as we need expression type

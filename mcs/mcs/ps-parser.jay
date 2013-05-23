@@ -3575,7 +3575,6 @@ primary_expression
 	| post_decrement_expression
 //	| object_or_delegate_creation_expression
 //	| anonymous_type_expression
-//	| typeof_expression
 	| sizeof_expression
 	| checked_expression
 	| unchecked_expression
@@ -4291,20 +4290,6 @@ variable_initializer_list
 		$$ = list;
 	  }
 	;
-
-//typeof_expression
-//	: TYPEOF
-//      {
-//	  	lexer.TypeOfParsing = true;
-//	  }
-//	  open_parens_any typeof_type_expression CLOSE_PARENS
-//	  {
-//		CheckIsPlayScript("typeof", GetLocation($1)); 	  
-//	  	lexer.TypeOfParsing = false;
-//		$$ = new TypeOf ((FullNamedExpression) $4, GetLocation ($1));
-//		lbag.AddLocation ($$, GetLocation ($3), GetLocation ($5));
-//	  }
-//	;
 	
 typeof_type_expression
 	: type_and_void
@@ -4575,7 +4560,7 @@ unary_expression
 	  }
 	| TYPEOF prefixed_unary_expression
 	  {
-	  	$$ = new AsTypeOf ((Expression) $2, GetLocation ($1));
+	  	$$ = new TypeOf ((Expression) $2, GetLocation ($1));
 	  }
 	| DELETE prefixed_unary_expression
 	  {
@@ -4616,13 +4601,7 @@ unary_expression
 //		Error_SyntaxError (yyToken);
 
 //		$$ = new Unary (Unary.Operator.AsE4xAttribute, null, GetLocation ($1));
-//	  }
-	| TYPEOF error
-	  {
-		Error_SyntaxError (yyToken);
-
-		$$ = new AsTypeOf (null, GetLocation ($1));
-	  }	    
+//	  }    
 	| DELETE error
 	  {
 		Error_SyntaxError (yyToken);
@@ -4753,7 +4732,7 @@ additive_expression
   	  }
 	| additive_expression OP_IN multiplicative_expression
 	  {
-		$$ = new AsIn ((Expression) $1, (Expression) $3, GetLocation ($2));
+		$$ = new In ((Expression) $1, (Expression) $3, GetLocation ($2));
 	  }	  
 	| additive_expression AS type
 	  {
@@ -4781,7 +4760,7 @@ additive_expression
 	  {
 		Error_SyntaxError (yyToken);
 
-		$$ = new AsIn ((Expression) $1, null, GetLocation ($2));
+		$$ = new In ((Expression) $1, null, GetLocation ($2));
 	  }
 	| additive_expression AS error
 	  {

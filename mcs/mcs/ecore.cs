@@ -714,7 +714,8 @@ namespace Mono.CSharp {
 			None = 0,
 			InvocableOnly = 1,
 			ExactArity = 1 << 2,
-			ReadAccess = 1 << 3
+			ReadAccess = 1 << 3,
+			PlayScriptConversion = 1 << 4
 		}
 
 		//
@@ -5950,7 +5951,7 @@ namespace Mono.CSharp {
 	// This is not an LValue because we need to re-write the expression. We
 	// can not take data from the stack and store it.
 	//
-	sealed class PropertyExpr : PropertyOrIndexerExpr<PropertySpec>
+	public sealed class PropertyExpr : PropertyOrIndexerExpr<PropertySpec>
 	{
 		Arguments arguments;
 
@@ -6224,7 +6225,7 @@ namespace Mono.CSharp {
 		}
 	}
 
-	abstract class PropertyOrIndexerExpr<T> : MemberExpr, IDynamicAssign where T : PropertySpec
+	public abstract class PropertyOrIndexerExpr<T> : MemberExpr, IDynamicAssign where T : PropertySpec
 	{
 		// getter and setter can be different for base calls
 		MethodSpec getter, setter;
