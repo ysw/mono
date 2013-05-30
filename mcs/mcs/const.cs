@@ -127,6 +127,11 @@ namespace Mono.CSharp {
 			}
 		}
 
+		public ConstSpec CreateAlias (string newName)
+		{
+			return new ConstSpec (declaringType, new AliasMemberDefinition (newName, definition), MemberType, metaInfo, modifiers, value);
+		}
+
 		//
 		// For compiled constants we have to resolve the value as there could be constant dependecies. This
 		// is needed for imported constants too to get the right context type

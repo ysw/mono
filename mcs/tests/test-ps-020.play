@@ -1,6 +1,6 @@
 package
 {
-	public class TypeofExpression
+	public class InOperator
 	{
 		public static function Main ():int
 		{
@@ -32,6 +32,14 @@ package
 
 			if ("PropS2" in TestClass)
 				return 8;
+
+			var a_i:Object = [1, 4];
+			var o_i:Object = -0;
+			if (!(o_i in a_i))
+				return 20;
+				
+			if (3 in a_i)
+				return 21;
 				
 			trace ("ok");
 			return 0;

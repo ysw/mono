@@ -285,7 +285,7 @@ namespace Mono.CSharp
 	//
 	public class FieldSpec : MemberSpec, IInterfaceMemberSpec
 	{
-		FieldInfo metaInfo;
+		protected FieldInfo metaInfo;
 		TypeSpec memberType;
 
 		public FieldSpec (TypeSpec declaringType, IMemberDefinition definition, TypeSpec memberType, FieldInfo info, Modifiers modifiers)

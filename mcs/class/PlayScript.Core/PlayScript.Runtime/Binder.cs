@@ -29,13 +29,14 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using Microsoft.CSharp.RuntimeBinder;
 
 namespace PlayScript.Runtime
 {
 	public static class Binder
 	{
-		static readonly ConditionalWeakTable<object, Dictionary<string, object>> dynamic_classes = new ConditionalWeakTable<object, Dictionary<string, object>> ();
+		static readonly ConditionalWeakTable<object, ConcurrentDictionary<string, object>> dynamic_classes = new ConditionalWeakTable<object, ConcurrentDictionary<string, object>> ();
 		
 		public static dynamic GetMember (object instance, Type context, object name)
 		{
@@ -44,8 +45,7 @@ namespace PlayScript.Runtime
 			
 			var sname = GetName (name);
 
-			// TODO: thread safety
-			Dictionary<string, object> members;
+			ConcurrentDictionary<string, object> members;
 			if (dynamic_classes.TryGetValue (instance, out members)) {
 				object value;
 				if (members.TryGetValue (sname, out value))
@@ -63,6 +63,18 @@ namespace PlayScript.Runtime
 		{
 			if (instance == null)
 				throw GetNullObjectReferenceException ();
+
+			//
+			// Use index setter when name can be converted to number on array instances 
+			//
+			var array = instance as _root.Array;
+			if (array != null) {
+				var index = GetArrayIndex (name);
+				if (index != null) {
+					array.setValue (index.Value, value);
+					return;
+				}
+			}				
 
 			var sname = GetName (name);
 
@@ -87,20 +99,29 @@ namespace PlayScript.Runtime
 			if (instance == null)
 				throw GetNullObjectReferenceException ();
 
+			//
+			// Calling in operator on Array instance means something different
+			//
+			var array = instance as _root.Array;
+			if (array != null) {
+				var index = GetArrayIndex (property);
+				if (index == null)
+					return false;
+
+				return array.length > index;
+			}
+
 			var type = instance as Type;
 			var sname = GetName (property);
 			bool static_only;
 
+			//
+			// It's null when it's not static
+			//
 			if (type == null) {
-				//
-				// It's null when it's not static
-				//
-				// TODO: thread safety
-				Dictionary<string, object> members;
-				if (dynamic_classes.TryGetValue (instance, out members)) {
-					if (members.ContainsKey (sname))
-						return true;
-
+				ConcurrentDictionary<string, object> members;
+				if (dynamic_classes.TryGetValue (instance, out members) && members.ContainsKey (sname)) {
+					return true;
 				}
 
 				type = instance.GetType ();
@@ -120,6 +141,41 @@ namespace PlayScript.Runtime
     		} catch (RuntimeBinderException) {
     			throw;
 			}
+		}
+
+		public static bool DeleteProperty (object instance, object property)
+		{
+			//
+			// delete operator on Array instances
+			//
+			var array = instance as _root.Array;
+			if (array != null) {
+				var index = GetArrayIndex (property);
+				if (index != null) {
+					array.deleteValue (index.Value);
+				}
+
+				return true;
+			}
+
+			ConcurrentDictionary<string, object> members;
+			if (dynamic_classes.TryGetValue (instance, out members)) {
+				var sname = GetName (property);
+
+				object value;
+				members.TryRemove (sname, out value);
+			}
+
+			return true;
+		}
+
+		static uint? GetArrayIndex (object value)
+		{
+			try {
+				return Convert.ToUInt32 (value);
+			} catch {
+				return null;
+			}			
 		}
 
 		static string GetName (object name)

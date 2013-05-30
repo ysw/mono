@@ -34,6 +34,8 @@ package {
 		public static const UNIQUESORT:uint = 4;
 		public static const RETURNINDEXEDARRAY:uint = 8;
 		public static const NUMERIC:uint = 16;
+
+		private static const DELETED:Object = new Object ();
 		
 		var vector:Vector.<Object>;
 
@@ -64,12 +66,28 @@ package {
 		//	// TODO: return vector.push (rest);
 		//}
 		
+
+		public function splice (startIndex:int = 0, deleteCount:uint = 4294967295 /*uint.MAX_VALUE*/, ...values):Array
+		{
+			throw new System.NotImplementedException ();
+		}
+
 		//
 		// Extensions to AS3
 		//
 		public function push (value:Object):uint
 		{
 			return vector.push (value);
+		}
+
+		internal function setValue (index:uint, value:Object):void
+		{
+			vector.setValue (index, value);
+		}
+
+		internal function deleteValue (index:uint):void
+		{
+			vector.setValue (index, DELETED);
 		}
 	}
 }

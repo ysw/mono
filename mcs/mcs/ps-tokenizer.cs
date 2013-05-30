@@ -3255,7 +3255,7 @@ namespace Mono.PlayScript
 					else
 						s = new string (value_builder, 0, pos);
 
-					ILiteralConstant res = new RegexLiteral (context.BuiltinTypes, s, 
+					ILiteralConstant res = new RegexLiteral (s, 
 					                                         opt_builder != null ? opt_builder.ToString() : null, 
 					                                         start_location);
 					val = res;
@@ -3334,7 +3334,7 @@ namespace Mono.PlayScript
 						else
 							s = new string (value_builder, 0, pos);
 						
-						ILiteralConstant res = new XmlLiteral (context.BuiltinTypes, s, start_location);
+						ILiteralConstant res = new XmlLiteral (s, start_location);
 						val = res;
 #if FULL_AST
 						res.ParsedValue = quoted ?

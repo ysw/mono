@@ -1289,4 +1289,54 @@ namespace Mono.CSharp {
 	{
 		TypeSpec MemberType { get; }
 	}
+
+	class AliasMemberDefinition : IMemberDefinition
+	{
+		readonly string name;
+		readonly IMemberDefinition original;
+
+		public AliasMemberDefinition (string name, IMemberDefinition original)
+		{
+			this.name = name;
+			this.original = original;
+		}
+
+		public bool? CLSAttributeValue {
+			get {
+				return original.CLSAttributeValue;
+			}
+		}
+
+		public string Name {
+			get {
+				return name;
+			}
+		}
+
+		public bool IsImported {
+			get {
+				return original.IsImported;
+			}
+		}
+
+		public string[] ConditionalConditions ()
+		{
+			return original.ConditionalConditions ();
+		}
+
+		public ObsoleteAttribute GetAttributeObsolete ()
+		{
+			return original.GetAttributeObsolete ();
+		}
+
+		public void SetIsAssigned ()
+		{
+			original.SetIsAssigned ();
+		}
+
+		public void SetIsUsed ()
+		{
+			original.SetIsUsed ();
+		}
+	}
 }

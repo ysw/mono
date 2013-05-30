@@ -292,128 +292,70 @@ namespace Mono.PlayScript
 		}
 	}
 
-	//
-	// ActionScript: Implements the ActionScript delete expression.
-	// This expression is used to implement the delete expression as
-	// well as the delete statement.  Handles both the element access
-	// form or the member access form.
-	//
-	public class AsDelete : ExpressionStatement {
-
-		public Expression Expr;
-		private Invocation removeExpr;
-		
-		public AsDelete (Expression expr, Location l)
+	public class Delete : ExpressionStatement
+	{
+		public Delete (Expression expr, Location l)
 		{
-			this.Expr = expr;
+			this.Expression = expr;
 			loc = l;
 		}
 
-		public override bool IsSideEffectFree {
-			get {
-				return removeExpr.IsSideEffectFree;
-			}
+		public Expression Expression { get; private set; }
+
+		public override Expression CreateExpressionTree (ResolveContext ec)
+		{
+			throw new NotImplementedException ("Expression trees conversion not implemented in PlayScript");
 		}
 
-		public override bool ContainsEmitWithAwait ()
+		protected override Expression DoResolve (ResolveContext rc)
 		{
-			return removeExpr.ContainsEmitWithAwait ();
-		}
+			var expr = Expression.Resolve (rc);
 
-		protected override Expression DoResolve (ResolveContext ec)
-		{
-/*
-			if (ec.Target == Target.JavaScript) {
-				type = ec.BuiltinTypes.Dynamic;
-				eclass = ExprClass.Value;
-				return this;
+			var dcma = expr as DynamicClassMemberAccess;
+			if (dcma != null) {
+				var ms = rc.Module.PlayScriptMembers.BinderDeleteProperty.Resolve (loc);
+				if (ms == null)
+					return null;
+
+				var mg = MethodGroupExpr.CreatePredefined (ms, ms.DeclaringType, loc);
+				var call_args = new Arguments (2);
+				call_args.Add (new Argument (dcma.Instance));
+				call_args.Add (dcma.Arguments [0]);
+
+				return new Invocation (mg, call_args).Resolve (rc);
 			}
-*/
-			if (Expr is ElementAccess) {
 
-				var elem_access = Expr as ElementAccess;
+			//
+			// Fixed properties cannot be deleted but it can be used with delete operator
+			//
+			var pe = expr as PropertyExpr;
+			if (pe != null) {
+				rc.Report.WarningPlayScript (3601, loc, "The declared property `{0}' cannot be deleted. To free associated memory, set its value to null",
+					pe.GetSignatureForError ());
 
-				if (elem_access.Arguments.Count != 1) {
-					ec.Report.Error (7021, loc, "delete statement must have only one index argument.");
-					return null;
-				}
-
-				var expr = elem_access.Expr.Resolve (ec);
-				if (expr.Type == null) {
-					return null;
-				}
-
-				if (expr.Type.IsArray) {
-					ec.Report.Error (7021, loc, "delete statement not allowed on arrays.");
-					return null;
-				}
-/*
-				if (ec.Target == Target.JavaScript) {
-					Expr = Expr.Resolve(ec);
-					return this;
-				}
-*/
-				removeExpr = new Invocation (new MemberAccess (expr, "Remove", loc), elem_access.Arguments);
-				return removeExpr.Resolve (ec);
-
-			} else if (Expr is MemberAccess) {
-/*
-				if (ec.Target == Target.JavaScript) {
-					Expr = Expr.Resolve(ec);
-					return this;
-				}
-*/
-				var memb_access = Expr as MemberAccess;
-
-				var expr = memb_access.LeftExpression.Resolve (ec);
-				if (expr.Type == null) {
-					return null;
-				}
-
-				var args = new Arguments(1);
-				args.Add (new Argument(new StringLiteral(ec.BuiltinTypes, memb_access.Name, loc)));
-				removeExpr = new Invocation (new MemberAccess (expr, "Remove", loc), args);
-				return removeExpr.Resolve (ec);
-
-			} else {
-				// Error is reported elsewhere.
-				return null;
+				expr = new BoolConstant (rc.BuiltinTypes, false, loc);
+				return expr.Resolve (rc);
 			}
-		}
 
-		protected override void CloneTo (CloneContext clonectx, Expression t)
-		{
-			var target = (AsDelete) t;
-
-			target.Expr = Expr.Clone (clonectx);
+			Expression = expr;
+			eclass = ExprClass.Value;
+			type = rc.BuiltinTypes.Bool;
+			return this;
 		}
 
 		public override void Emit (EmitContext ec)
 		{
-			throw new System.NotImplementedException ();
+			Expression.Emit (ec);
+
+			// Always returns true
+			ec.EmitInt (1);
 		}
 
 		public override void EmitStatement (EmitContext ec)
 		{
-			throw new System.NotImplementedException ();
-		}
-/*
-		public override void EmitJs (JsEmitContext jec)
-		{
-			jec.Buf.Write ("delete ", Location);
-			Expr.EmitJs (jec);
-		}
-
-		public override void EmitStatementJs (JsEmitContext jec)
-		{
-			jec.Buf.Write ("\t", Location);
-			EmitJs (jec);
-			jec.Buf.Write (";\n");
-		}
-*/
-		public override Expression CreateExpressionTree (ResolveContext ec)
-		{
-			return removeExpr.CreateExpressionTree(ec);
+			Expression.Emit (ec);
+			if (Expression.Type.Kind != MemberKind.Void)
+				ec.Emit (OpCodes.Pop);
 		}
 
 		public override object Accept (StructuralVisitor visitor)
@@ -434,12 +376,9 @@ namespace Mono.PlayScript
 				
 		protected override Expression DoResolve (ResolveContext rc)
 		{
-			var expr = Expression.Resolve (rc); //, ResolveFlags.VariableOrValue | ResolveFlags.Type);
+			var expr = Expression.Resolve (rc);
 			if (expr == null)
 				return null;
-
-//			if (expr is TypeExpr)
-//				expr = new CSharp.TypeOf (rc.Module.PlayscriptTypes.Object, Location).Resolve (rc);
 
 			var ms = rc.Module.PlayScriptMembers.OperationsTypeof.Resolve (loc);
 			if (ms == null)
@@ -494,7 +433,7 @@ namespace Mono.PlayScript
 		readonly public string Regex;
 		readonly public string Options;
 
-		public RegexLiteral (BuiltinTypes types, string regex, string options, Location loc)
+		public RegexLiteral (string regex, string options, Location loc)
 			: base (loc)
 		{
 			Regex = regex;
@@ -589,7 +528,7 @@ namespace Mono.PlayScript
 	{
 		readonly public string Xml;
 
-		public XmlLiteral (BuiltinTypes types, string xml, Location loc)
+		public XmlLiteral (string xml, Location loc)
 			: base (loc)
 		{
 			Xml = xml;
@@ -1455,8 +1394,6 @@ namespace Mono.PlayScript
 
 	class DynamicClassMemberAccess : PlayScriptExpression, IAssignMethod
 	{
-		Expression instance;
-		Arguments args;
 		Expression invocation;
 
 		public DynamicClassMemberAccess (ElementAccess ea)
@@ -1466,10 +1403,14 @@ namespace Mono.PlayScript
 
 		public DynamicClassMemberAccess (Expression instance, Arguments args, Location loc)
 		{
-			this.instance = instance;
-			this.args = args;
+			this.Instance = instance;
+			this.Arguments = args;
 			this.loc = loc;
 		}
+
+		public Arguments Arguments { get; private set; }
+
+		public Expression Instance { get; private set; }
 
 		protected override Expression DoResolve (ResolveContext rc)
 		{
@@ -1481,9 +1422,9 @@ namespace Mono.PlayScript
 
 			var mg = MethodGroupExpr.CreatePredefined (ms, ms.DeclaringType, loc);
 			var call_args = new Arguments (3);
-			call_args.Add (new Argument (instance));
+			call_args.Add (new Argument (Instance));
 			call_args.Add (new Argument (new CSharp.TypeOf (rc.CurrentType, loc)));
-			call_args.Add (args [0]);
+			call_args.Add (Arguments [0]);
 
 			invocation = new Invocation (mg, call_args).Resolve (rc);
 			if (invocation == null)
@@ -1504,9 +1445,9 @@ namespace Mono.PlayScript
 
 			var mg = MethodGroupExpr.CreatePredefined (ms, ms.DeclaringType, loc);
 			var call_args = new Arguments (3);
-			call_args.Add (new Argument (instance));
+			call_args.Add (new Argument (Instance));
 			call_args.Add (new Argument (new CSharp.TypeOf (rc.CurrentType, loc)));
-			call_args.Add (args [0]);
+			call_args.Add (Arguments [0]);
 			call_args.Add (new Argument (rhs));
 
 			invocation = new Invocation (mg, call_args).Resolve (rc);
@@ -1593,6 +1534,7 @@ namespace Mono.PlayScript
 	class PredefinedTypes
 	{
 		public readonly BuiltinTypeSpec Object;
+
 		public readonly PredefinedType Vector;
 		public readonly PredefinedType Array;
 		public readonly PredefinedType Error;
@@ -1624,7 +1566,7 @@ namespace Mono.PlayScript
 			Binder = new PredefinedType (module, MemberKind.Class, "PlayScript.Runtime", "Binder");
 			Operations = new PredefinedType (module, MemberKind.Class, "PlayScript.Runtime", "Operations");
 
-			// Types also used for comparisons
+			// Define types which also used for comparisons early
 			Array.Define ();
 		}
 	}
@@ -1636,6 +1578,7 @@ namespace Mono.PlayScript
 		public readonly PredefinedMember<MethodSpec> BinderGetMember;
 		public readonly PredefinedMember<MethodSpec> BinderSetMember;
 		public readonly PredefinedMember<MethodSpec> BinderHasProperty;
+		public readonly PredefinedMember<MethodSpec> BinderDeleteProperty;
 		public readonly PredefinedMember<MethodSpec> OperationsTypeof;
 
 		public PredefinedMembers (ModuleContainer module)
@@ -1650,6 +1593,7 @@ namespace Mono.PlayScript
 			VectorPush = new PredefinedMember<MethodSpec> (module, ptypes.Vector, "push", new TypeParameterSpec (0, tp, SpecialConstraint.None, Variance.None, null));
 			BinderGetMember = new PredefinedMember<MethodSpec> (module, ptypes.Binder, "GetMember", btypes.Object, btypes.Type, btypes.Object);
 			BinderSetMember = new PredefinedMember<MethodSpec> (module, ptypes.Binder, "SetMember", btypes.Object, btypes.Type, btypes.Object, btypes.Object);
+			BinderDeleteProperty = new PredefinedMember<MethodSpec> (module, ptypes.Binder, "DeleteProperty", btypes.Object, btypes.Object);
 			BinderHasProperty = new PredefinedMember<MethodSpec> (module, ptypes.Binder, "HasProperty", btypes.Object, btypes.Type, btypes.Object);
 			OperationsTypeof = new PredefinedMember<MethodSpec> (module, ptypes.Operations, "Typeof", btypes.Object);
 		}

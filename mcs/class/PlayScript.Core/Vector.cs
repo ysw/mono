@@ -102,6 +102,19 @@ namespace _root
 			list.InsertRange (0, args);
 			return length;
 		}
+
+		internal void setValue (uint index, T value)
+		{
+			if (index < length) {
+				list [(int) index] = value;
+				return;
+			}
+
+//			while (length < index - 1)
+//				list.Add (default (T)); // TODO: Need better "invisible" value, perhaps DELETED?
+
+			list.Add (value);
+		}		
 	}
 }
 

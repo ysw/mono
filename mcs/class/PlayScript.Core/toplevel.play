@@ -100,8 +100,8 @@ package {
 
 	// Constants
 	public const undefined : * = PlayScript.Runtime.Undefined.Value;
-	public const Infinity : Number = double.PositiveInfinity;
-	public const NaN : Number = double.NaN;
+	public const Infinity : Number = System.Double.PositiveInfinity;
+	public const NaN : Number = System.Double.NaN;
 
 /*	
 	public function loadEmbed(baseObject:Object, fieldName:String):Object

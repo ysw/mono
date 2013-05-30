@@ -3529,31 +3529,8 @@ base_type_name
  * simple types, but we need this to reuse it easily in variable_type
  */
 builtin_types
-	: /* OBJECT	{ $$ = new TypeExpression (compiler.BuiltinTypes.Object, GetLocation ($1)); }
-	| STRING	{ $$ = new TypeExpression (compiler.BuiltinTypes.String, GetLocation ($1)); }
-	| BOOL		{ $$ = new TypeExpression (compiler.BuiltinTypes.Bool, GetLocation ($1)); }
-	| */ DECIMAL { CheckIsPlayScript("decimal", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.Decimal, GetLocation ($1)); }
-	| FLOAT		{ CheckIsPlayScript("float", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.Float, GetLocation ($1)); }
-//	| FLOAT2	{ CheckIsPlayScript("float2", GetLocation($1)); $$ = MakeMonoSimdType("Vector4f", GetLocation($1)); }
-//	| FLOAT3	{ CheckIsPlayScript("float3", GetLocation($1)); $$ = MakeMonoSimdType("Vector4f", GetLocation($1)); }
-//	| FLOAT4	{ CheckIsPlayScript("float4", GetLocation($1)); $$ = MakeMonoSimdType("Vector4f", GetLocation($1)); }
-	| DOUBLE	{ CheckIsPlayScript("double", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.Double, GetLocation ($1)); }
-//	| DOUBLE2	{ CheckIsPlayScript("double2", GetLocation($1)); $$ = MakeMonoSimdType("Vector2d", GetLocation($1)); }
-//	| DOUBLE3	{ CheckIsPlayScript("double3", GetLocation($1)); $$ = MakeMonoSimdType("Vector4d", GetLocation($1)); }
-//	| DOUBLE4	{ CheckIsPlayScript("double4", GetLocation($1)); $$ = MakeMonoSimdType("Vector4d", GetLocation($1)); }
-	| integral_type
-	;
-
-integral_type
-	: SBYTE		{ CheckIsPlayScript("sbyte", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.SByte, GetLocation ($1)); }
-	| BYTE		{ CheckIsPlayScript("byte", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.Byte, GetLocation ($1)); }
-	| SHORT		{ CheckIsPlayScript("short", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.Short, GetLocation ($1)); }
-	| USHORT	{ CheckIsPlayScript("ushort", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.UShort, GetLocation ($1)); }
-	| INT		{ $$ = new TypeExpression (compiler.BuiltinTypes.Int, GetLocation ($1)); }
+	: INT		{ $$ = new TypeExpression (compiler.BuiltinTypes.Int, GetLocation ($1)); }
 	| UINT		{ $$ = new TypeExpression (compiler.BuiltinTypes.UInt, GetLocation ($1)); }
-	| LONG		{ CheckIsPlayScript("long", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.Long, GetLocation ($1)); }
-	| ULONG		{ CheckIsPlayScript("ulong", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.ULong, GetLocation ($1)); }
-	| CHAR		{ CheckIsPlayScript("char", GetLocation($1)); $$ = new TypeExpression (compiler.BuiltinTypes.Char, GetLocation ($1)); }
 	;
 
 //
@@ -4564,12 +4541,7 @@ unary_expression
 	  }
 	| DELETE prefixed_unary_expression
 	  {
-	  	var expr = $2 as Expression;
-	  	if (!(expr is ElementAccess || expr is MemberAccess)) {
-			report.Error (7022, GetLocation ($1),
-				"delete operator may only be used with element access or member access expressions");
-	  	}
-		$$ = new AsDelete ((Expression) $2, GetLocation ($1));
+		$$ = new Delete ((Expression) $2, GetLocation ($1));
 	  } 
 	| BANG error
 	  {
@@ -4606,7 +4578,7 @@ unary_expression
 	  {
 		Error_SyntaxError (yyToken);
 		
-		$$ = new AsDelete (null, GetLocation ($1));
+		$$ = new Delete (null, GetLocation ($1));
 	  }	  
 	;
 
@@ -5764,7 +5736,6 @@ valid_declaration_statement
 	| using_statement
 	| unsafe_statement
 	| fixed_statement
-//	| delete_statement
 	| local_function_statement
 	;
 
@@ -5782,7 +5753,6 @@ interactive_valid_declaration_statement
 	| using_statement
 	| unsafe_statement
 	| fixed_statement
-//	| delete_statement
 	| local_function_statement
 	;
 
@@ -6990,19 +6960,6 @@ using_or_fixed_variable_initializer
 		$$ = current_variable;
 	  }
 	;
-
-//delete_statement
-//	: DELETE element_access SEMICOLON
-//	  {
-//		$$ = new StatementExpression (new AsDelete ((Expression) $2, GetLocation ($1)));
-//		lbag.AddStatement ($$, GetLocation ($2));
-//	  }
-//	| DELETE member_access SEMICOLON
-//	  {
-//		$$ = new StatementExpression (new AsDelete ((Expression) $2, GetLocation ($1)));	
-//		lbag.AddStatement ($$, GetLocation ($2));
-//	  }
-//	;
 
 // LINQ
 
