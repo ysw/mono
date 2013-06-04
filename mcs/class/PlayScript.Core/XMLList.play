@@ -14,6 +14,14 @@
 
 package {
 
+	public /*final*/ dynamic class XMLList
+	{
+		public function XMLList (value:*=null)
+		{
+
+		}
+	}
+/*
 	import System.Xml.*;
 	import System.Collections.*;
 	import System.Collections.Generic.*;
@@ -86,7 +94,7 @@ package {
 			throw new System.NotImplementedException();
 		}
 						
-		public function descendants(name:Object /*="*"*/):XMLList {
+		public function descendants(name:Object):XMLList {
 			throw new System.NotImplementedException();
 		}
 		
@@ -94,7 +102,7 @@ package {
 			throw new System.NotImplementedException();
 		}
 		
-		public function elements(name:String /*="*"*/):XMLList {
+		public function elements(name:String):XMLList {
 			if (mList.Count == 0)
 				return new XMLList();
 
@@ -168,5 +176,5 @@ package {
 			return mList.GetEnumerator();
 		}
 	}
-
+*/
 }

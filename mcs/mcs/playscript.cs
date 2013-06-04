@@ -232,11 +232,13 @@ namespace Mono.PlayScript
 
 		public override TypeSpec ResolveAsType (IMemberContext mc)
 		{
-			// TODO: An untyped variable is not the same as a variable of type Object.
+			//
+			// An untyped variable is not the same as a variable of type Object.
 			// The key difference is that untyped variables can hold the special value
 			// undefined, while a variable of type Object cannot hold that value.
-
-			return mc.Module.PlayscriptTypes.Object;
+			// Also any conversion is done at runtime.
+			//
+			return mc.Module.Compiler.BuiltinTypes.Dynamic;
 		}
 	}
 
@@ -414,7 +416,7 @@ namespace Mono.PlayScript
 		public override TypeSpec Resolve (IMemberContext rc, int index)
 		{
 			TypeExpression = new TypeExpression (rc.Module.PlayscriptTypes.Array.Resolve (), Location);
-			attr = rc.Module.PlayscriptAttributes.RestArrayParameterAttribute;
+			attr = rc.Module.PlayscriptAttributes.RestArrayParameter;
 			attr.Define ();
 
 			return base.Resolve (rc, index);
@@ -1055,6 +1057,150 @@ namespace Mono.PlayScript
 		}
 	}
 
+	public class NamespaceMemberName : MemberName
+	{
+		public NamespaceMemberName (string namespaceName, string name, Location loc)
+			: base (new MemberName (namespaceName, loc), name, loc)
+		{
+		}
+	}
+
+	public class NamespaceField : FieldBase
+	{
+		class NamespaceInitializer : FieldInitializer
+		{
+			readonly NamespaceField field;
+
+			public NamespaceInitializer (NamespaceField field, Expression value, Location loc)
+				: base (field, value, loc)
+			{
+				this.field = field;
+			}
+
+			protected override ExpressionStatement ResolveInitializer (ResolveContext rc)
+			{
+				if (source == null)
+					return null;
+
+				source = source.Resolve (rc);
+				if (source == null)
+					return null;
+
+				source = GetStringValue (rc, source);
+				if (source == null) {
+					rc.Report.ErrorPlayScript (1171, loc, "A namespace initializer must be either a literal string or another namespace.");
+					return null;
+				}
+
+				var args = new Arguments (2);
+				args.Add (new Argument (new NullLiteral (loc)));
+				args.Add (new Argument (source));
+				source = new New (new TypeExpression (field.MemberType, loc), args, loc);
+
+				return base.ResolveInitializer (rc);
+			}
+
+			public static StringConstant GetStringValue (IMemberContext mc, Expression source)
+			{
+				var sc = source as StringConstant;
+				if (sc != null)
+					return sc;
+
+				var fe = source as FieldExpr;
+				if (fe == null)
+					return null;
+
+				var nf = fe.Spec as NamespaceFieldSpec;
+				if (nf == null)
+					return null;
+
+				return new StringConstant (mc.Module.Compiler.BuiltinTypes, nf.GetValue (), Location.Null);
+			}
+		}
+
+		const Modifiers AllowedModifiers =
+			Modifiers.PUBLIC |
+			Modifiers.PROTECTED |
+			Modifiers.INTERNAL |
+			Modifiers.PRIVATE;
+
+		public NamespaceField (TypeDefinition parent, Modifiers mod, MemberName name, Expression initializer, Attributes attrs)
+			: base (parent, null, mod, AllowedModifiers, name, attrs)
+		{
+			Initializer = initializer;
+		}
+
+		public override bool Define ()
+		{
+			if (!base.Define ())
+				return false;
+
+			ModFlags |= Modifiers.STATIC;
+
+			FieldAttributes field_attr = FieldAttributes.InitOnly | ModifiersExtensions.FieldAttr (ModFlags);
+			FieldBuilder = Parent.TypeBuilder.DefineField (GetFullName (MemberName), MemberType.GetMetaInfo (), field_attr);
+
+			spec = new NamespaceFieldSpec (Parent.Definition, this, MemberType, FieldBuilder, ModFlags);
+			Parent.MemberCache.AddMember (spec);
+
+			if (initializer != null) {
+				Parent.PartialContainer.RegisterFieldForInitialization (this,  new NamespaceInitializer (this, initializer, Location));
+			}
+
+			return true;
+		}
+
+		public override void Emit ()
+		{
+			base.Emit ();
+
+			Module.PlayscriptAttributes.NamespaceField.EmitAttribute (FieldBuilder, GetValue ());
+		}
+
+		public string GetValue ()
+		{
+			if (initializer == null)
+				return null;
+
+			var sc = NamespaceInitializer.GetStringValue (this, initializer);
+			if (sc == null)
+				return null;
+
+			return sc.Value;
+		}
+
+		protected override bool ResolveMemberType ()
+		{
+			member_type = Module.PlayscriptTypes.Namespace.Resolve ();
+			return true;
+		}
+	}
+
+	class NamespaceFieldSpec : FieldSpec
+	{
+		string value;
+
+		public NamespaceFieldSpec (TypeSpec declaringType, IMemberDefinition definition, TypeSpec memberType, FieldInfo info, Modifiers modifiers)
+			: base (declaringType, definition, memberType, info, modifiers)
+		{
+		}
+
+		public NamespaceFieldSpec (TypeSpec declaringType, IMemberDefinition definition, TypeSpec memberType, FieldInfo info, Modifiers modifiers, string value)
+			: this (declaringType, definition, memberType, info, modifiers)
+		{
+			this.value = value;
+		}
+
+		public string GetValue ()
+		{
+			var def = MemberDefinition as NamespaceField;
+			if (def != null)
+				return def.GetValue ();
+
+			return value;
+		}
+	}
+
 	interface IConstantProperty
 	{
 		Expression Initializer { get; }
@@ -1108,7 +1254,7 @@ namespace Mono.PlayScript
 					Parent.AddField (lazy_field);
 
 					// 
-					// If (!SetField) {
+					// if (!SetField) {
 					//   SetField = true;
 					//   LazyField = Initializer;
 					// }
@@ -1541,6 +1687,8 @@ namespace Mono.PlayScript
 		public readonly PredefinedType Function;
 		public readonly PredefinedType RegExp;
 		public readonly PredefinedType Xml;
+		public readonly PredefinedType Namespace;
+
 		public readonly PredefinedType Binder;
 		public readonly PredefinedType Operations;
 
@@ -1562,6 +1710,7 @@ namespace Mono.PlayScript
 			Function = new PredefinedType (module, MemberKind.Class, RootNamespace, "Function");
 			RegExp = new PredefinedType (module, MemberKind.Class, RootNamespace, "RegExp");
 			Xml = new PredefinedType (module, MemberKind.Class, RootNamespace, "XML");
+			Namespace = new PredefinedType (module, MemberKind.Class, RootNamespace, "Namespace");
 
 			Binder = new PredefinedType (module, MemberKind.Class, "PlayScript.Runtime", "Binder");
 			Operations = new PredefinedType (module, MemberKind.Class, "PlayScript.Runtime", "Operations");
@@ -1633,17 +1782,51 @@ namespace Mono.PlayScript
 			}
 		}
 
+		public class PredefinedNamespaceAttribute : PredefinedAttribute
+		{
+			PredefinedMember<MethodSpec> ctor_definition;
+
+			public PredefinedNamespaceAttribute (ModuleContainer module, string ns, string name)
+				: base (module, ns, name)
+			{
+			}
+
+			public void EmitAttribute (FieldBuilder builder, string value)
+			{
+				if (ctor_definition == null) {
+					if (!Define ())
+						return;
+
+					ctor_definition = new PredefinedMember<MethodSpec> (module, type, CSharp.MemberFilter.Constructor (
+						ParametersCompiled.CreateFullyResolved (module.Compiler.BuiltinTypes.String)));
+				}
+
+				var ctor = ctor_definition.Get ();
+				if (ctor == null)
+					return;
+
+				AttributeEncoder encoder = new AttributeEncoder ();
+				encoder.Encode (value);
+				encoder.EncodeEmptyNamedArguments ();
+
+				builder.SetCustomAttribute ((ConstructorInfo) ctor.GetMetaInfo (), encoder.ToArray ());
+			}
+		}
+
 		public readonly PredefinedConstantAttribute ConstantField;
-		public readonly PredefinedAttribute DynamicClassAttribute;
-		public readonly PredefinedAttribute PlayScriptAttribute;
-		public readonly PredefinedAttribute RestArrayParameterAttribute;
+		public readonly PredefinedNamespaceAttribute NamespaceField;
+		public readonly PredefinedAttribute DynamicClass;
+		public readonly PredefinedAttribute PlayScript;
+		public readonly PredefinedAttribute RestArrayParameter;
 
 		public PredefinedAttributes (ModuleContainer module)
 		{
-			ConstantField = new PredefinedConstantAttribute (module, "PlayScript.Runtime.CompilerServices", "ConstantFieldAttribute");
-			DynamicClassAttribute = new PredefinedAttribute (module, "PlayScript.Runtime.CompilerServices", "DynamicClassAttribute");
-			PlayScriptAttribute = new PredefinedAttribute (module, "PlayScript.Runtime.CompilerServices", "PlayScriptAttribute");
-			RestArrayParameterAttribute = new PredefinedAttribute (module, "PlayScript.Runtime.CompilerServices", "RestArrayParameterAttribute");
+			var ns = "PlayScript.Runtime.CompilerServices";
+			ConstantField = new PredefinedConstantAttribute (module, ns, "ConstantFieldAttribute");
+			NamespaceField = new PredefinedNamespaceAttribute (module, ns, "NamespaceFieldAttribute");
+			DynamicClass = new PredefinedAttribute (module, ns, "DynamicClassAttribute");
+			PlayScript = new PredefinedAttribute (module, ns, "PlayScriptAttribute");
+			RestArrayParameter = new PredefinedAttribute (module, ns, "RestArrayParameterAttribute");
 		}
 	}
 

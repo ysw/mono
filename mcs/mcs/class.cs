@@ -2713,9 +2713,9 @@ namespace Mono.CSharp
 
 			if (IsPlayScriptType) {
 				if ((ModFlags & Modifiers.DYNAMIC) != 0) {
-					Module.PlayscriptAttributes.DynamicClassAttribute.EmitAttribute (TypeBuilder);
+					Module.PlayscriptAttributes.DynamicClass.EmitAttribute (TypeBuilder);
 				} else {
-					Module.PlayscriptAttributes.PlayScriptAttribute.EmitAttribute (TypeBuilder);
+					Module.PlayscriptAttributes.PlayScript.EmitAttribute (TypeBuilder);
 				}
 			} else if (base_type != null && base_type.HasDynamicElement) {
 				Module.PredefinedAttributes.Dynamic.EmitAttribute (TypeBuilder, base_type, Location);
@@ -3502,9 +3502,9 @@ namespace Mono.CSharp
 		//
 		// Returns full metadata method name
 		//
-		public string GetFullName (MemberName name)
+		public override string GetFullName (MemberName name)
 		{
-			return GetFullName (name.Name);
+			return GetFullName (base.GetFullName (name));
 		}
 
 		public string GetFullName (string name)
@@ -3670,6 +3670,20 @@ namespace Mono.CSharp
 			CheckProtectedModifier ();
 
 			return true;
+		}
+
+		//
+		// Returns full metadata method name
+		//
+		public virtual string GetFullName (MemberName name)
+		{
+			if (name.Left != null) {
+				StringBuilder sb = new StringBuilder ();
+				name.CreateMetadataName (sb);
+				return sb.ToString ();
+			}
+
+			return name.Name;
 		}
 
 		public override string GetSignatureForDocumentation ()

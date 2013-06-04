@@ -1,4 +1,11 @@
+//
+// Namespace.play
+//
+// Authors:
+//	Marek Safar  <marek.safar@gmail.com>
+//
 // Copyright 2013 Zynga Inc.
+// Copyright (C) 2013 Xamarin, Inc (http://www.xamarin.com)
 //	
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,34 +21,41 @@
 
 package {
 
-	public class Namespace {
-	
+	public final class Namespace
+	{
+		private var prefix_value:String;
+		private var uri_value:String;
+
+		public function Namespace (prefix:*=null, uri:*=null)
+		{
+			prefix_value = prefix;
+			uri_value = uri;
+		}
+
 		//
 		// Properties
 		//
-		
-		public property prefix : String { get; set; }
+		public function get prefix () : String
+		{
+			return prefix_value;
+		}
 
-		public property uri : String { get; set; }
+		public function get uri () : String
+		{
+			return uri_value;
+		}
 
 		// 
 		// Methods
 		//
-		
-		public function Namespace(prefixValue:*, uriValue:*) {
-		}
-		
-		public function Namespace(uriValue:*) {
-		}
-
-		public function toString():String {
+		public function toString ():String
+		{
 			throw new System.NotImplementedException();
 		}
 
-		public function valueOf():Object {
+		public function valueOf ():Object
+		{
 			throw new System.NotImplementedException();
 		}
-	
 	}
-
 }

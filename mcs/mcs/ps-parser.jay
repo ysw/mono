@@ -46,6 +46,8 @@ namespace Mono.PlayScript
 		public const bool parsing_playscript = true;
 		
 		static readonly object ModifierNone = 0;
+
+		LocatedToken namespace_modifier;
 	
 //		const string RootNs = PredefinedTypes.RootNamespace;
 	
@@ -376,7 +378,6 @@ namespace Mono.PlayScript
 %token LITERAL
 
 %token IDENTIFIER
-%token IDENTIFIER_MODIFIER
 %token IDENTIFIER_CONFIG
 %token OPEN_PARENS_LAMBDA
 %token OPEN_PARENS_CAST
@@ -834,7 +835,6 @@ type_declaration
 	| interface_declaration
 	| enum_declaration		
 	| delegate_declaration
-	| namespace_declaration	
 	;
 		
 //
@@ -1093,6 +1093,7 @@ class_member_declaration
 	| field_declaration
 	| method_declaration
 	| property_declaration
+	| namespace_declaration
 	| event_declaration
 	| indexer_declaration
 	| operator_declaration
@@ -1216,6 +1217,27 @@ struct_declaration
 		Error_SyntaxError (yyToken);
 	  }
 	;
+
+namespace_declaration
+	: opt_attributes 
+	  opt_modifiers
+	  NAMESPACE IDENTIFIER opt_namespace_initializer SEMICOLON
+	  {
+		var lt = (LocatedToken) $4;
+		var td = GetTypeDefinition (current_container);
+
+		var ns = new NamespaceField (td, (Modifiers) $2, CreateFullMemberName (lt), (Expression) $5, (Attributes) $1);
+		td.AddMember (ns);
+	  }
+	;
+
+opt_namespace_initializer
+	: /* empty */
+	| ASSIGN constant_initializer_expr 
+	  {
+		$$ = $2;
+	  }
+	;
 	
 constant_declaration
 	: opt_attributes 
@@ -1224,7 +1246,7 @@ constant_declaration
 	  {
 		var lt = (LocatedToken) $4;
 		var td = GetTypeDefinition (current_container);
-		current_field = new ConstantField (td, (FullNamedExpression) $6, (Modifiers) $2, new MemberName (lt.Value, lt.Location), (Attributes) $1);
+		current_field = new ConstantField (td, (FullNamedExpression) $6, (Modifiers) $2, CreateFullMemberName (lt), (Attributes) $1);
 		if (is_config_enabled) {
 			td.AddMember (current_field);
 		}
@@ -1245,8 +1267,8 @@ constant_declaration
 	;
 
 constant_initializer_expr
-       : constant_expression
-       ;
+    : constant_expression
+    ;
 
 field_declaration
 	: opt_attributes
@@ -1260,7 +1282,7 @@ field_declaration
 			report.Error (670, GetLocation ($6), "Fields cannot have void type");
 			
 		var lt = (LocatedToken) $4;
-		current_field = new Field (current_type, type, (Modifiers) $2, new MemberName (lt.Value, lt.Location), (Attributes) $1);
+		current_field = new Field (current_type, type, (Modifiers) $2, CreateFullMemberName (lt), (Attributes) $1);
 		if (is_config_enabled) {
 			current_type.AddField (current_field);
 		}
@@ -1280,6 +1302,7 @@ field_declaration
 		$$ = current_field;
 		current_field = null;
 	  }
+/*
 	| opt_attributes
 	  opt_modifiers
 	  FIXED IDENTIFIER COLON simple_type 
@@ -1315,6 +1338,7 @@ field_declaration
 	  {
 		report.Error (1641, GetLocation ($8), "A fixed size buffer field must have the array size specifier after the field name");
 	  }
+*/
 	;
 	
 opt_field_initializer
@@ -3179,38 +3203,6 @@ delegate_declaration
 		current_delegate = null;
 	  }
 	;
-	
-namespace_declaration
-	: opt_attributes 
-	  opt_modifiers 
-	  NAMESPACE 
-	  IDENTIFIER opt_namespace_url SEMICOLON
-	  {
-		var lt = (LocatedToken) $4;	  
-		MemberName className = new MemberName(lt.Value + "_ns", GetLocation($4));
-		push_current_container(new Class (current_container, className, (Modifiers) $2, (Attributes) $1), GetLocation($3));	  
-		pop_current_class();
-			  
-	  	if (doc_support) {
-			current_delegate.DocComment = Lexer.consume_doc_comment ();
-			Lexer.doc_state = XmlCommentState.Allowed;
-		}
-	  }
-	;
-	
-opt_namespace_url
-   	: /* empty */
-   	| namespace_url
-   	;
-   	
-namespace_url
-	: ASSIGN LITERAL
-	  {
-	  	if (!($2 is StringLiteral))
-	  		syntax_error (GetLocation($2), "string literal expected");
-	  	$$ = $2;
-	  }
-	;
 
 opt_nullable
 	: /* empty */
@@ -3301,7 +3293,7 @@ type_declaration_name
 	  {
 		lexer.parsing_generic_declaration = false;
 		var lt = (LocatedToken) $1;
-		$$ = new MemberName (lt.Value, (TypeParameters)$3, lt.Location);
+		$$ = CreateFullMemberName (lt, (TypeParameters)$3);
 	  }
 	;
 
@@ -3317,12 +3309,14 @@ member_declaration_name
 
 method_declaration_name
 	: type_declaration_name
+/*	
 	| explicit_interface IDENTIFIER opt_type_parameter_list
 	  {
 		lexer.parsing_generic_declaration = false;	  
 		var lt = (LocatedToken) $2;
 		$$ = new MemberName (lt.Value, (TypeParameters) $3, (ATypeNameExpression) $1, lt.Location);
 	  }
+*/
 	;
 	
 indexer_declaration_name
@@ -3331,13 +3325,15 @@ indexer_declaration_name
 		lexer.parsing_generic_declaration = false;	  
 		$$ = new MemberName (TypeDefinition.DefaultIndexerName, GetLocation ($1));
 	  }
+/*	  
 	| explicit_interface THIS
 	  {
 		lexer.parsing_generic_declaration = false;
 		$$ = new MemberName (TypeDefinition.DefaultIndexerName, null, (ATypeNameExpression) $1, GetLocation ($2));
 	  }
+*/
 	;
-
+/*
 explicit_interface
 	: IDENTIFIER opt_type_argument_list DOT
 	  {
@@ -3360,7 +3356,8 @@ explicit_interface
 		lbag.AddLocation ($$, GetLocation ($4));
 	  }
 	;
-	
+*/
+
 opt_type_parameter_list
 	: /* empty */
 	| OP_GENERICS_LT type_parameters OP_GENERICS_GT
@@ -5315,26 +5312,38 @@ opt_modifiers
 
 modifiers
 	: modifier
+	  {
+		$$ = $1 ?? ModifierNone;
+	  }
 	| modifiers modifier
-	  { 
-		var m1 = (Modifiers) $1;
-		var m2 = (Modifiers) $2;
+	  {
+	  	if ($2 == null) {
+			var m1 = (Modifiers) $1;
 
-		if ((m1 & m2) != 0) {
-			report.Error (1004, lexer.Location - ModifiersExtensions.Name (m2).Length,
-				"Duplicate `{0}' modifier", ModifiersExtensions.Name (m2));
-		} else if ((m2 & Modifiers.AccessibilityMask) != 0 && (m1 & Modifiers.AccessibilityMask) != 0 &&
-			((m2 | m1 & Modifiers.AccessibilityMask) != (Modifiers.PROTECTED | Modifiers.INTERNAL))) {
-			report.Error (107, lexer.Location - ModifiersExtensions.Name (m2).Length,
-				"More than one protection modifier specified");
+			if ((m1 & Modifiers.AccessibilityMask) != 0) {
+				report.ErrorPlayScript (1003, GetLocation ($2),
+					"Access specifiers are not allowed with namespace attributes.");
+			}
+	  	} else {
+			var m1 = (Modifiers) $1;
+			var m2 = (Modifiers) $2;
+
+			if ((m1 & m2) != 0) {
+				report.ErrorPlayScript (1127, lexer.Location - ModifiersExtensions.Name (m2).Length,
+					"Attribute `{0}' was specified multiple times.", ModifiersExtensions.Name (m2));
+			} else if ((m2 & Modifiers.AccessibilityMask) != 0 && (m1 & Modifiers.AccessibilityMask) != 0 &&
+				((m2 | m1 & Modifiers.AccessibilityMask) != (Modifiers.PROTECTED | Modifiers.INTERNAL))) {
+				report.ErrorPlayScript (1154, lexer.Location - ModifiersExtensions.Name (m2).Length,
+					"Only one of public, private, protected, or internal can be specified on a definition.");
+			}
+			
+			$$ = m1 | m2;
 		}
-		
-		$$ = m1 | m2;
 	  }
 	;
 
 modifier
-	: NEW
+/*	: NEW
 	  {
 		$$ = Modifiers.NEW;
 		StoreModifierLocation ($$, GetLocation ($1));
@@ -5342,7 +5351,8 @@ modifier
 		if (current_container.Kind == MemberKind.Namespace)
 			report.Error (1530, GetLocation ($1), "Keyword `new' is not allowed on namespace elements");
 	  }
-	| PUBLIC
+*/
+	: PUBLIC
 	  {
 		$$ = Modifiers.PUBLIC;
 		StoreModifierLocation ($$, GetLocation ($1));
@@ -5377,11 +5387,11 @@ modifier
 		$$ = Modifiers.STATIC;
 		StoreModifierLocation ($$, GetLocation ($1));
 	  }
-	| READONLY
-	  {
-		$$ = Modifiers.READONLY;
-		StoreModifierLocation ($$, GetLocation ($1));
-	  }
+//	| READONLY
+//	  {
+//		$$ = Modifiers.READONLY;
+//		StoreModifierLocation ($$, GetLocation ($1));
+//	  }
 	| VIRTUAL
 	  {
 		$$ = Modifiers.VIRTUAL;
@@ -5402,13 +5412,13 @@ modifier
 		$$ = Modifiers.VOLATILE;
 		StoreModifierLocation ($$, GetLocation ($1));
 	  }
-	| UNSAFE
-	  {
-		$$ = Modifiers.UNSAFE;
-		StoreModifierLocation ($$, GetLocation ($1));
-		if (!settings.Unsafe)
-			Error_UnsafeCodeNotAllowed (GetLocation ($1));
-	  }
+//	| UNSAFE
+//	  {
+//		$$ = Modifiers.UNSAFE;
+//		StoreModifierLocation ($$, GetLocation ($1));
+//		if (!settings.Unsafe)
+//			Error_UnsafeCodeNotAllowed (GetLocation ($1));
+//	  }
 	| ASYNC
 	  {
 		$$ = Modifiers.ASYNC;
@@ -5419,10 +5429,14 @@ modifier
 	    $$ = Modifiers.DYNAMIC;
 	    StoreModifierLocation ($$, GetLocation ($1));
 	  }
-	| IDENTIFIER_MODIFIER
+	| IDENTIFIER
 	  {
-	    $$ = Modifiers.INTERNAL;
-	    StoreModifierLocation ($$, GetLocation ($1));
+		if (namespace_modifier != null)
+			report.ErrorPlayScript (1162, GetLocation ($1), "Only one namespace attribute can be used per definition");
+		else
+			namespace_modifier = (LocatedToken) $1;
+
+		$$ = null;
 	  }
 	;
 	
@@ -8059,6 +8073,18 @@ void CheckIsPlayScript(string elem, Location loc)
 	}
 
 }
+
+MemberName CreateFullMemberName (LocatedToken lt, TypeParameters tparams = null)
+{
+	if (namespace_modifier != null) {
+		var res = new NamespaceMemberName (namespace_modifier.Value, lt.Value, lt.Location);
+		namespace_modifier = null;
+		return res;
+	}
+
+	return new MemberName (lt.Value, tparams, lt.Location);
+}
+
 /*
 object ConvertAsType(SimpleName sn, object e)
 {
@@ -8198,7 +8224,6 @@ string GetSymbolName (int token)
 	case Token.LITERAL:
 		return "Literal " + ((Constant)lexer.Value).GetValue ().ToString ();
 	case Token.IDENTIFIER:
-	case Token.IDENTIFIER_MODIFIER:
 	case Token.IDENTIFIER_CONFIG:
 		return "Identifier " + ((LocatedToken)lexer.Value).Value ?? "";
 	case Token.BOOL:

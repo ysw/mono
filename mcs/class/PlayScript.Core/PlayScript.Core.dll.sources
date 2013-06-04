@@ -39,5 +39,6 @@
 ./PlayScript.Runtime/Undefined.cs
 ./PlayScript.Runtime.CompilerServices/ConstantFieldAttribute.cs
 ./PlayScript.Runtime.CompilerServices/DynamicClassAttribute.cs
+./PlayScript.Runtime.CompilerServices/NamespaceFieldAttribute.cs
 ./PlayScript.Runtime.CompilerServices/PlayScriptAttribute.cs
 ./PlayScript.Runtime.CompilerServices/RestArrayParameterAttribute.cs

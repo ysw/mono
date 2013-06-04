@@ -346,7 +346,7 @@ namespace Mono.CSharp {
 				//
 				// Implicit dynamic conversion
 				//
-				if (expr_type.BuiltinType == BuiltinTypeSpec.Type.Dynamic || expr_type.BuiltinType == BuiltinTypeSpec.Type.Object) {
+				if (expr_type.BuiltinType == BuiltinTypeSpec.Type.Dynamic) {
 					switch (target_type.Kind) {
 					case MemberKind.ArrayType:
 					case MemberKind.Class:
@@ -362,6 +362,9 @@ namespace Mono.CSharp {
 
 					return false;
 				}
+
+				if (expr_type.BuiltinType == BuiltinTypeSpec.Type.Object)
+					return target_type.BuiltinType == BuiltinTypeSpec.Type.Object || target_type.BuiltinType == BuiltinTypeSpec.Type.Dynamic;
 
 				break;
 			}

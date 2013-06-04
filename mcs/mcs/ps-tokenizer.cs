@@ -983,13 +983,13 @@ namespace Mono.PlayScript
 				// TODO: some explanation needed
 				check_incorrect_doc_comment ();
 				break;
-			case Token.NAMESPACE:
-				// TODO: some explanation needed
-				if (!handle_namespace)
-					res = -1;
-				else 
-					check_incorrect_doc_comment ();
-				break;
+//			case Token.NAMESPACE:
+//				// TODO: some explanation needed
+//				if (!handle_namespace)
+//					res = -1;
+//				else 
+//					check_incorrect_doc_comment ();
+//				break;
 				
 			case Token.PARTIAL:
 				if (parsing_block > 0 || !parsing_playscript) {
@@ -3469,8 +3469,7 @@ namespace Mono.PlayScript
 			if (quoted && parsing_attribute_section)
 				AddEscapedIdentifier (((LocatedToken) val).Location);
 
-			return is_config_ident ? Token.IDENTIFIER_CONFIG : 
-				((parsing_modifiers && !parsing_attribute_section) ? Token.IDENTIFIER_MODIFIER : Token.IDENTIFIER);
+			return is_config_ident ? Token.IDENTIFIER_CONFIG : Token.IDENTIFIER;
 		}
 
 		string InternIdentifier (char[] charBuffer, int length)

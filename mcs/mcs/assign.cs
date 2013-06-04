@@ -565,11 +565,16 @@ namespace Mono.CSharp {
 				return null;
 
 			if (resolved == null) {
-				var ctx = new FieldInitializerContext (mc, ec);
-				resolved = base.DoResolve (ctx) as ExpressionStatement;
+				resolved = ResolveInitializer (ec);
 			}
 
 			return resolved;
+		}
+
+		protected virtual ExpressionStatement ResolveInitializer (ResolveContext rc)
+		{
+			var ctx = new FieldInitializerContext (mc, rc);
+			return base.DoResolve (ctx) as ExpressionStatement;
 		}
 
 		public override void EmitStatement (EmitContext ec)

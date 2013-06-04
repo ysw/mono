@@ -205,6 +205,16 @@ namespace Mono.CSharp
 						return new ConstSpec (declaringType, definition, field_type, fi, mod, dc);
 				}
 
+				if (field_type == module.PlayscriptTypes.Namespace.TypeSpec) {
+					var attributes = CustomAttributeData.GetCustomAttributes (fi);
+
+					var data = FindAttribute (attributes, "NamespaceFieldAttribute", PlayScriptCompilerNamespace);
+					if (data != null) {
+						string value = data.ConstructorArguments[0].Value as string;
+						return new PlayScript.NamespaceFieldSpec (declaringType, definition, field_type, fi, mod, value);
+					}
+				}
+
 				mod |= Modifiers.READONLY;
 			} else {
 				var req_mod = fi.GetRequiredCustomModifiers ();
