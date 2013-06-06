@@ -142,7 +142,6 @@ namespace Mono.PlayScript
 		List<int> temp_auto_semi_after_tokens = new List<int>();
 		readonly int tab_size;
 		bool parsing_playscript = true;
-		bool handle_namespace = true;
 		bool handle_get_set = false;
 		bool handle_dynamic = true;
 		bool handle_each = false;
@@ -256,11 +255,6 @@ namespace Mono.PlayScript
 		public bool ParsingPlayScript {
 			get { return parsing_playscript; }
 			set { parsing_playscript = value; }
-		}
-
-		public bool NamespaceParsing {
-			get { return handle_namespace; }
-			set { handle_namespace = value; }
 		}
 
 		public bool PropertyParsing {
@@ -976,20 +970,10 @@ namespace Mono.PlayScript
 					res = Token.OP_IN;
 				break;
 
-			case Token.USE:
-				handle_namespace = true;
-				break;
 			case Token.USING:
 				// TODO: some explanation needed
 				check_incorrect_doc_comment ();
 				break;
-//			case Token.NAMESPACE:
-//				// TODO: some explanation needed
-//				if (!handle_namespace)
-//					res = -1;
-//				else 
-//					check_incorrect_doc_comment ();
-//				break;
 				
 			case Token.PARTIAL:
 				if (parsing_block > 0 || !parsing_playscript) {
@@ -1134,13 +1118,13 @@ namespace Mono.PlayScript
 				if (!parsing_playscript)
 					res = -1;
 				else
-					parsing_modifiers = handle_namespace = false;
+					parsing_modifiers = false;
 				
 				break;
 
 			case Token.CLASS:
 			case Token.INTERFACE:
-				parsing_modifiers = handle_namespace = false;
+				parsing_modifiers = false;
 				break;
 
 			}

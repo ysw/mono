@@ -112,6 +112,12 @@ namespace Mono.CSharp {
 			}
 		}
 
+		public virtual string LookupName {
+			get {
+				return Name;
+			}
+		}
+
 		public void CreateMetadataName (StringBuilder sb)
 		{
 			if (Left != null)
@@ -137,7 +143,7 @@ namespace Mono.CSharp {
 			return Left.GetSignatureForDocumentation () + "." + s;
 		}
 
-		public string GetSignatureForError ()
+		public virtual string GetSignatureForError ()
 		{
 			string s = TypeParameters == null ? null : "<" + TypeParameters.GetSignatureForError () + ">";
 			s = Name + s;

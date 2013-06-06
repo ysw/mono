@@ -1394,49 +1394,6 @@ field_declarator
 	  }
 	;	
 
-opt_fixed_field_declarators
-	: /* empty */
-	| fixed_field_declarators
-	;
-	
-fixed_field_declarators
-	: fixed_field_declarator
-	  {
-		current_field.AddDeclarator ((FieldDeclarator) $1);
-	  }
-	| fixed_field_declarators fixed_field_declarator
-	  {
-		current_field.AddDeclarator ((FieldDeclarator) $2);
-	  }
-	;
-	
-fixed_field_declarator
-	: COMMA IDENTIFIER fixed_field_size COLON member_type
-	  {
-		var lt = (LocatedToken) $2;	  
-		$$ = new FieldDeclarator (new SimpleMemberName (lt.Value, lt.Location), (ConstInitializer) $3, (FullNamedExpression) $5);
-		lbag.AddLocation ($$, GetLocation ($1));
-	  }
-	;
-
-fixed_field_size
-	: OPEN_BRACKET
-	  {
-		++lexer.parsing_block;
-	  }
-	  expression CLOSE_BRACKET
-	  {
-		--lexer.parsing_block;
-		$$ = new ConstInitializer (current_field, (Expression) $3, GetLocation ($1));
-		lbag.AddLocation ($$, GetLocation ($4));
-	  }
-	| OPEN_BRACKET error
-	  {
-		report.Error (443, lexer.Location, "Value or constant expected");
-		$$ = null;
-	  }	  
-	;
-
 variable_initializer
 	: expression
 	| error
@@ -3217,14 +3174,14 @@ opt_nullable
 
 namespace_or_type_expr
 	: member_name
-//	| qualified_alias_member IDENTIFIER opt_type_argument_list
-//	  {
-//		var lt1 = (LocatedToken) $1;
-//		var lt2 = (LocatedToken) $2;
-//		
-//		$$ = new QualifiedAliasMember (lt1.Value, lt2.Value, (TypeArguments) $3, lt1.Location);
-//		lbag.AddLocation ($$, GetLocation ($2));
-//	  }
+	| qualified_identifier IDENTIFIER opt_type_argument_list
+	  {
+		var lt1 = (LocatedToken) $1;
+		var lt2 = (LocatedToken) $2;
+		
+		$$ = new QualifiedMemberAccess (lt1.Value, lt2.Value, lt1.Location);
+		lbag.AddLocation ($$, GetLocation ($2));
+	  }
 	;
 
 member_name
@@ -3632,26 +3589,20 @@ member_access
 		$$ = new MemberAccess ((Expression) $1, lt.Value, (TypeArguments) $4, lt.Location);
 		lbag.AddLocation ($$, GetLocation ($2));
 	  }
-//	| BASE DOT identifier_inside_body opt_type_argument_list
-//	  {
-//		var lt = (LocatedToken) $3;
-//		$$ = new MemberAccess (new BaseThis (GetLocation ($1)), lt.Value, (TypeArguments) $4, lt.Location);
-//		lbag.AddLocation ($$, GetLocation ($2));
-//	  }
 	| SUPER DOT IDENTIFIER opt_type_argument_list
 	  {
 		var lt = (LocatedToken) $3;
 		$$ = new MemberAccess (new BaseThis (GetLocation ($1)), lt.Value, (TypeArguments) $4, lt.Location);
 		lbag.AddLocation ($$, GetLocation ($2));
 	  }
-//	| qualified_alias_member identifier_inside_body opt_type_argument_list
-//	  {
-//		var lt1 = (LocatedToken) $1;
-//		var lt2 = (LocatedToken) $2;
-//
-//		$$ = new QualifiedAliasMember (lt1.Value, lt2.Value, (TypeArguments) $3, lt1.Location);
-//		lbag.AddLocation ($$, GetLocation ($2));
-//	  }
+	| qualified_identifier identifier_inside_body opt_type_argument_list
+	  {
+		var lt1 = (LocatedToken) $1;
+		var lt2 = (LocatedToken) $2;
+
+		$$ = new QualifiedMemberAccess (lt1.Value, lt2.Value, lt1.Location);
+		lbag.AddLocation ($$, GetLocation ($2));
+	  }
 	| primary_expression DOT GENERATE_COMPLETION {
 		$$ = new CompletionMemberAccess ((Expression) $1, null,GetLocation ($3));
 	  }
@@ -3696,6 +3647,7 @@ e4x_operators
 		lbag.AddLocation ($$, GetLocation ($2));
 		$$ = ma;
 	  }
+/*
 	| primary_expression DOUBLE_COLON IDENTIFIER
 	  {
 		var lt = (LocatedToken) $3;
@@ -3708,7 +3660,8 @@ e4x_operators
 		var ea = new E4XIndexer (E4XIndexer.Operator.Namespace, (Expression) $1, (Arguments) $4, GetLocation ($3));
 		lbag.AddLocation (GetLocation ($3), GetLocation ($5));
 		$$ = ea;
-	  }	  
+	  }
+*/	  
 	| primary_expression DOT_AT OPEN_BRACKET_EXPR expression_list_arguments CLOSE_BRACKET
 	  {
 		var ea = new E4XIndexer (E4XIndexer.Operator.Attribute, (Expression) $1, (Arguments) $4, GetLocation ($3));
@@ -4312,7 +4265,7 @@ unbound_type_name
 		$$ = new MemberAccess (tne, lt.Value, (int) $4, lt.Location);		
 	  }
 	;
-*/
+
 generic_dimension
 	: GENERIC_DIMENSION
 	  {
@@ -4322,17 +4275,14 @@ generic_dimension
 		$$ = $1;
 	  }
 	;
-	
-//qualified_alias_member
-//	: IDENTIFIER DOUBLE_COLON
-//	  {
-//		var lt = (LocatedToken) $1;
-//		if (lang_version == LanguageVersion.ISO_1)
-//			FeatureIsNotAvailable (lt.Location, "namespace alias qualifier");
-//
-//		$$ = lt;		
-//	  }
-//	;
+*/
+
+qualified_identifier
+	: IDENTIFIER DOUBLE_COLON
+	  {
+		$$ = $1;
+	  }
+	;
 
 sizeof_expression
 	: SIZEOF open_parens_any type CLOSE_PARENS
@@ -5622,7 +5572,7 @@ block
   		$$ = $4;
 	  }
 	;
-	
+/*	
 //
 // An optional config block is "contained" on the following places:
 //	method_body
@@ -5645,16 +5595,16 @@ config_block
   		}
 	  }
 	;
-
-opt_block_config
-	: /* empty */
-	| IDENTIFIER DOUBLE_COLON IDENTIFIER
-	  {
-	    var lt1 = (LocatedToken) $1;
-	    var lt2 = (LocatedToken) $3;
-        is_config_enabled = file.IsConditionalDefined (lt1.Value + "_" + lt2.Value);
-	  }
-	;
+*/
+//opt_block_config
+//	: /* empty */
+//	| IDENTIFIER DOUBLE_COLON IDENTIFIER
+//	  {
+//	    var lt1 = (LocatedToken) $1;
+//	    var lt2 = (LocatedToken) $3;
+//        is_config_enabled = file.IsConditionalDefined (lt1.Value + "_" + lt2.Value);
+//	  }
+//	;
 
 block_end 
 	: CLOSE_BRACE 
@@ -5737,8 +5687,7 @@ interactive_statement
 	;
 
 valid_declaration_statement
-	: config_block
-	| empty_statement
+	: empty_statement
 	| expression_statement
 	| selection_statement
 	| iteration_statement
@@ -5754,8 +5703,7 @@ valid_declaration_statement
 	;
 
 interactive_valid_declaration_statement
-	: config_block
-	| empty_statement
+	: empty_statement
     | interactive_expression_statement
 	| selection_statement
 	| iteration_statement
@@ -5818,9 +5766,8 @@ labeled_statement
 use_namespace_statement
 	: USE NAMESPACE IDENTIFIER stmnt_end_semicolon
 	  {
-		Lexer.NamespaceParsing = false;
-		var lt = (LocatedToken) $2;		
-		$$ = new AsUseNamespaceStatement (lt.Value, GetLocation ($1));		
+		var lt = (LocatedToken) $3;
+		$$ = new UseNamespace (lt.Value, GetLocation ($1));		
 	  }
 	;
 

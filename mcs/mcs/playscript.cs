@@ -718,50 +718,47 @@ namespace Mono.PlayScript
 		}
 	}
 
-	// Use namespace statement
-	public class AsUseNamespaceStatement : Statement {
-
-		public string NS;
-
-		public AsUseNamespaceStatement(string ns, Location loc)
+	public class UseNamespace : Statement
+	{
+		public UseNamespace (string ns, Location loc)
 		{
+			Namespace = ns;
 			this.loc = loc;
-			NS = ns;
 		}
 
-		public override bool Resolve (BlockContext ec)
+		public string Namespace { get; private set; }
+
+		public override bool Resolve (BlockContext bc)
 		{
+			// TODO: Implement by adding the name to BlockContext namespaces list. Then when 
+			// doing the namespace lookup get the list and do search with prefixes from the list
+			// It looks like once the name is added (used) it's never removed even if the scope
+			// is different
 			return true;
 		}
 		
-		public override bool ResolveUnreachable (BlockContext ec, bool warn)
+		public override bool ResolveUnreachable (BlockContext bc, bool warn)
 		{
 			return true;
 		}
 		
 		public override void Emit (EmitContext ec)
 		{
+			// Nothing, not even sequence point
 		}
-/*		
-		public override void EmitJs (JsEmitContext jec)
-		{
-		}
-*/
+
 		protected override void DoEmit (EmitContext ec)
 		{
-			throw new NotSupportedException ();
 		}
 		
 		protected override void CloneTo (CloneContext clonectx, Statement target)
 		{
-			// nothing needed.
 		}
 		
 		public override object Accept (StructuralVisitor visitor)
 		{
 			return visitor.Visit (this);
 		}
-
 	}
 
 	public class AsNonAssignStatementExpression : Statement
@@ -1057,11 +1054,53 @@ namespace Mono.PlayScript
 		}
 	}
 
+	public class QualifiedMemberAccess : MemberAccess
+	{
+		public QualifiedMemberAccess (string namespaceName, string identifier, Location l)
+			: base (null, identifier, l)
+		{
+			this.Namespace = namespaceName;
+		}
+
+		public string Namespace { get; private set; }
+
+		public override Expression LookupNameExpression (ResolveContext rc, MemberLookupRestrictions restrictions)
+		{
+/*
+			expr = rc.LookupNamespaceAlias (Namespace);
+			if (expr == null) {
+				// TODO: New error code
+				rc.Module.Compiler.Report.ErrorPlayScript (9999, loc, "Namespace `{0}' not found", Namespace);
+				return null;
+			}
+*/
+			var expr_type = rc.CurrentType;
+			var name = Namespace + "." + Name;
+			var member_lookup = MemberLookup (rc, false, expr_type, name, 0, restrictions, loc);
+			if (member_lookup != null)
+				return member_lookup;
+
+			// TODO: Implement correct rules for out of context namespaces
+			throw new NotImplementedException ("Namespace global lookup");
+		}
+	}
+
 	public class NamespaceMemberName : MemberName
 	{
 		public NamespaceMemberName (string namespaceName, string name, Location loc)
 			: base (new MemberName (namespaceName, loc), name, loc)
 		{
+		}
+
+		public override string LookupName {
+			get {
+				return Left.LookupName + "." + base.LookupName;
+			}
+		}
+
+		public override string GetSignatureForError ()
+		{
+			return Left.GetSignatureForError () + "::" + Name;
 		}
 	}
 
